@@ -1,0 +1,804 @@
+@model List<ChatConversationItem>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
+
+<div class="chat-container">
+    <!-- Header -->
+    <div class="chat-header">
+        <div class="header-left">
+            <a href="/Chat/Index" class="back-btn" title="Back to Chats">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div class="logo-icon">
+                <i class="fas fa-eye-slash"></i>
+            </div>
+            <h1>Hidden Chats</h1>
+        </div>
+        <div class="header-right">
+            <button class="settings-btn" onclick="showHideUserModal()" title="Hide User">
+                <i class="fas fa-user-slash"></i>
+            </button>
+            <button class="settings-btn" onclick="showHideGroupModal()" title="Hide Group">
+                <i class="fas fa-users-slash"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Hidden User List -->
+    <div class="user-list">
+        @if (Model.Count == 0)
+        {
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-eye-slash"></i>
+                </div>
+                <h3>No hidden conversations</h3>
+                <p>Use the buttons above to hide users or groups</p>
+            </div>
+        }
+        else
+        {
+            foreach (var conv in Model)
+            {
+                @if (conv.IsGroup)
+                {
+                    <div class="user-item" style="cursor:pointer;" onclick="location.href='/Chat/GroupChat/@conv.Id'">
+                        <div class="user-avatar-wrapper">
+                            <div class="user-avatar" style="background: linear-gradient(135deg, #f093fb, #f5576c);">
+                                @if (!string.IsNullOrEmpty(conv.ProfileImagePath))
+                                {
+                                    <img src="@conv.ProfileImagePath" alt="@conv.DisplayName" class="avatar-img" />
+                                }
+                                else
+                                {
+                                    <span><i class="fas fa-users"></i></span>
+                                }
+                            </div>
+                        </div>
+                        <div class="user-info">
+                            <div class="user-header">
+                                <span class="user-name"><i class="fas fa-users" style="margin-right: 6px; color: #667eea;"></i>@conv.DisplayName</span>
+                                @if (conv.LastMessageTime.HasValue)
+                                {
+                                    <span class="msg-time">@conv.LastMessageTime.Value.ToString("h:mm tt").Replace(".", ":")</span>
+                                }
+                            </div>
+                            <div class="user-preview">
+                                <span class="last-message">@conv.LastMessageText</span>
+                            </div>
+                        </div>
+                        <button class="unhide-btn" onclick="event.stopPropagation(); unhideGroup(@conv.Id)" title="Unhide Group">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="user-item" style="cursor:pointer;" onclick="location.href='/Chat/Chat/@conv.Id'">
+                        <div class="user-avatar-wrapper">
+                            <div class="user-avatar">
+                                @if (!string.IsNullOrEmpty(conv.ProfileImagePath))
+                                {
+                                    <img src="@conv.ProfileImagePath" alt="@conv.DisplayName" class="avatar-img" />
+                                }
+                                else
+                                {
+                                    <span>@conv.DisplayName.Substring(0, 1).ToUpper()</span>
+                                }
+                            </div>
+                            @if (conv.IsOnline)
+                            {
+                                <span class="online-indicator"></span>
+                            }
+                        </div>
+                        <div class="user-info">
+                            <div class="user-header">
+                                <span class="user-name">@conv.DisplayName</span>
+                                @if (conv.LastMessageTime.HasValue)
+                                {
+                                    <span class="msg-time">@conv.LastMessageTime.Value.ToString("h:mm tt").Replace(".", ":")</span>
+                                }
+                            </div>
+                            <div class="user-preview">
+                                <span class="last-message">
+                                    @if (!string.IsNullOrEmpty(conv.FileType))
+                                    {
+                                        if (conv.FileType.StartsWith("image/"))
+                                        {
+                                            <i class="fas fa-image"></i>
+                                        }
+                                        else if (conv.FileType.StartsWith("video/"))
+                                        {
+                                            <i class="fas fa-video"></i>
+                                        }
+                                        else
+                                        {
+                                            <i class="fas fa-file"></i>
+                                        }
+                                        @conv.FileName
+                                    }
+                                    else
+                                    {
+                                        @(string.IsNullOrEmpty(conv.LastMessageText) ? "Click to start chatting" : conv.LastMessageText)
+                                    }
+                                </span>
+                            </div>
+                        </div>
+                        <button class="unhide-btn" onclick="event.stopPropagation(); unhideUser(@conv.Id)" title="Unhide User">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                }
+            }
+        }
+    </div>
+</div>
+
+<!-- Hide User Modal -->
+<div class="hide-modal-overlay" id="hideUserModal">
+    <div class="hide-modal-content">
+        <div class="hide-modal-header">
+            <h3>Hide User</h3>
+            <button class="hide-modal-close" onclick="closeHideUserModal()">&times;</button>
+        </div>
+        <div class="hide-modal-list">
+            @if (ViewBag.AllUsers != null)
+            {
+                var allUsers = (List<Chat_App.Models.UsersList>)ViewBag.AllUsers;
+                if (allUsers.Count == 0)
+                {
+                    <p style="text-align:center;color:#9ca3af;padding:30px 0;">All users are already hidden</p>
+                }
+                else
+                {
+                    foreach (var user in allUsers)
+                    {
+                        <div class="hide-modal-item">
+                            <div class="hide-modal-avatar">
+                                @if (!string.IsNullOrEmpty(user.ProfileImagePath))
+                                {
+                                    <img src="@user.ProfileImagePath" />
+                                }
+                                else
+                                {
+                                    <span>@user.username.Substring(0,1).ToUpper()</span>
+                                }
+                            </div>
+                            <span class="hide-modal-name">@user.username</span>
+                            <button class="hide-modal-action" onclick="hideUser(@user.Id)">Hide</button>
+                        </div>
+                    }
+                }
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Hide Group Modal -->
+<div class="hide-modal-overlay" id="hideGroupModal">
+    <div class="hide-modal-content">
+        <div class="hide-modal-header">
+            <h3>Hide Group</h3>
+            <button class="hide-modal-close" onclick="closeHideGroupModal()">&times;</button>
+        </div>
+        <div class="hide-modal-list">
+            @if (ViewBag.AllGroups != null)
+            {
+                var allGroups = (List<Chat_App.Models.GroupCredentials>)ViewBag.AllGroups;
+                if (allGroups.Count == 0)
+                {
+                    <p style="text-align:center;color:#9ca3af;padding:30px 0;">All groups are already hidden</p>
+                }
+                else
+                {
+                    foreach (var group in allGroups)
+                    {
+                        <div class="hide-modal-item">
+                            <div class="hide-modal-avatar" style="background:linear-gradient(135deg,#f093fb,#f5576c);">
+                                @if (!string.IsNullOrEmpty(group.ProfileImagePath))
+                                {
+                                    <img src="@group.ProfileImagePath" />
+                                }
+                                else
+                                {
+                                    <i class="fas fa-users"></i>
+                                }
+                            </div>
+                            <span class="hide-modal-name">@group.GroupName</span>
+                            <button class="hide-modal-action" onclick="hideGroup(@group.GroupId)">Hide</button>
+                        </div>
+                    }
+                }
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+        --primary-color: #6366f1;
+        --secondary-color: #8b5cf6;
+        --bg-gradient: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+        --card-bg: rgba(255, 255, 255, 0.98);
+        --text-primary: #1f2937;
+        --text-secondary: #6b7280;
+        --text-muted: #9ca3af;
+        --success-color: #10b981;
+        --danger-color: #ef4444;
+        --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        --radius-sm: 8px;
+        --radius-md: 12px;
+        --radius-lg: 16px;
+        --radius-xl: 24px;
+    }
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+    html, body {
+        height: 100%;
+        overflow: hidden;
+    }
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: var(--bg-gradient);
+        min-height: 100%;
+    }
+    .chat-container {
+        position: fixed;
+        inset: 0;
+        max-width: 800px;
+        margin: 0 auto;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: var(--card-bg);
+        backdrop-filter: blur(20px);
+        box-shadow: var(--shadow-xl);
+        overflow: hidden;
+    }
+    @@media (min-width: 768px) {
+        .chat-container {
+            margin: 30px auto;
+            border-radius: var(--radius-xl);
+            height: calc(100vh - 60px);
+        }
+    }
+
+    .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 24px 32px;
+        background: var(--primary-gradient);
+        color: white;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        box-shadow: var(--shadow-lg);
+    }
+    .header-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    .back-btn {
+        width: 44px;
+        height: 44px;
+        background: rgba(255,255,255,0.15);
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        text-decoration: none;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        backdrop-filter: blur(10px);
+    }
+    .back-btn:hover {
+        background: rgba(255,255,255,0.25);
+        transform: translateX(-3px) scale(1.05);
+        box-shadow: var(--shadow-md);
+    }
+    .logo-icon {
+        width: 48px;
+        height: 48px;
+        background: rgba(255,255,255,0.2);
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        backdrop-filter: blur(10px);
+        animation: pulse-glow 3s ease-in-out infinite;
+    }
+    @@keyframes pulse-glow {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.3); }
+        50% { box-shadow: 0 0 20px 5px rgba(255, 255, 255, 0.2); }
+    }
+    .header-left h1 {
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .header-right {
+        display: flex;
+        gap: 12px;
+    }
+    .settings-btn {
+        width: 44px;
+        height: 44px;
+        border: none;
+        border-radius: var(--radius-md);
+        background: rgba(255,255,255,0.15);
+        color: white;
+        cursor: pointer;
+        font-size: 18px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        backdrop-filter: blur(10px);
+    }
+    .settings-btn:hover {
+        background: rgba(255,255,255,0.25);
+        transform: scale(1.1) rotate(5deg);
+        box-shadow: var(--shadow-md);
+    }
+
+    .user-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 0;
+    }
+    .user-item {
+        display: flex;
+        align-items: center;
+        padding: 20px 32px;
+        border-bottom: 1px solid rgba(0,0,0,0.04);
+        text-decoration: none;
+        color: inherit;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        gap: 18px;
+        position: relative;
+        overflow: hidden;
+    }
+    .user-item::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        width: 4px;
+        background: var(--primary-gradient);
+        transform: scaleY(0);
+        transition: transform 0.3s ease;
+    }
+    .user-item:hover {
+        background: linear-gradient(90deg, rgba(99, 102, 241, 0.04) 0%, rgba(255,255,255,0) 100%);
+        padding-left: 40px;
+    }
+    .user-item:hover::before {
+        transform: scaleY(1);
+    }
+    .user-avatar-wrapper {
+        position: relative;
+        flex-shrink: 0;
+    }
+    .user-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: var(--radius-lg);
+        background: var(--primary-gradient);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 22px;
+        font-weight: 700;
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+        transition: all 0.3s ease;
+    }
+    .user-item:hover .user-avatar {
+        transform: scale(1.08) rotate(-3deg);
+        box-shadow: 0 8px 20px rgba(99, 102, 241, 0.5);
+    }
+    .avatar-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: var(--radius-lg);
+    }
+    .online-indicator {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 16px;
+        height: 16px;
+        background: var(--success-color);
+        border-radius: 50%;
+        border: 3px solid white;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.5);
+        animation: pulse 2s ease-in-out infinite;
+    }
+    @@keyframes pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+        50% { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
+    }
+    .user-info {
+        flex: 1;
+        min-width: 0;
+    }
+    .user-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+    }
+    .user-name {
+        font-size: 17px;
+        font-weight: 600;
+        color: var(--text-primary);
+        letter-spacing: -0.3px;
+    }
+    .msg-time {
+        font-size: 13px;
+        color: var(--text-muted);
+        font-weight: 500;
+    }
+    .user-preview {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .last-message {
+        font-size: 14px;
+        color: var(--text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 280px;
+        font-weight: 400;
+    }
+    .last-message i {
+        margin-right: 6px;
+        color: var(--primary-color);
+    }
+    .unhide-btn {
+        width: 42px;
+        height: 42px;
+        border: none;
+        border-radius: var(--radius-md);
+        background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+        color: var(--success-color);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        flex-shrink: 0;
+        box-shadow: var(--shadow-sm);
+    }
+    .unhide-btn:hover {
+        background: var(--success-color);
+        color: white;
+        transform: scale(1.15) rotate(-10deg);
+        box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+    }
+
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 100px 30px;
+        text-align: center;
+    }
+    .empty-icon {
+        width: 100px;
+        height: 100px;
+        background: var(--primary-gradient);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 40px;
+        margin-bottom: 28px;
+        box-shadow: 0 12px 40px rgba(99, 102, 241, 0.4);
+        animation: float 4s ease-in-out infinite;
+    }
+    @@keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+    .empty-state h3 {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 10px;
+        letter-spacing: -0.5px;
+    }
+    .empty-state p {
+        font-size: 15px;
+        color: var(--text-secondary);
+        max-width: 280px;
+    }
+
+    /* Hide Modals */
+    .hide-modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(8px);
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        animation: fadeIn 0.3s ease;
+    }
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    .hide-modal-overlay.active {
+        display: flex;
+    }
+    .hide-modal-content {
+        width: 440px;
+        max-height: 70vh;
+        overflow: hidden;
+        background: white;
+        border-radius: var(--radius-xl);
+        display: flex;
+        flex-direction: column;
+        box-shadow: var(--shadow-xl);
+        animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    @@keyframes slideUp {
+        from { transform: translateY(30px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    .hide-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 24px 28px;
+        border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+    .hide-modal-header h3 {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--text-primary);
+        letter-spacing: -0.3px;
+    }
+    .hide-modal-close {
+        width: 36px;
+        height: 36px;
+        border: none;
+        background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+        border-radius: 50%;
+        font-size: 20px;
+        cursor: pointer;
+        color: var(--text-secondary);
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .hide-modal-close:hover {
+        background: #fee2e2;
+        color: var(--danger-color);
+        transform: rotate(90deg);
+    }
+    .hide-modal-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px 20px;
+    }
+    .hide-modal-item {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 16px;
+        border-radius: var(--radius-md);
+        transition: all 0.3s ease;
+        margin-bottom: 4px;
+    }
+    .hide-modal-item:hover {
+        background: linear-gradient(90deg, rgba(99, 102, 241, 0.06) 0%, rgba(255,255,255,0) 100%);
+    }
+    .hide-modal-avatar {
+        width: 46px;
+        height: 46px;
+        border-radius: var(--radius-md);
+        overflow: hidden;
+        background: var(--primary-gradient);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        flex-shrink: 0;
+        box-shadow: var(--shadow-md);
+    }
+    .hide-modal-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .hide-modal-avatar i, .hide-modal-avatar span {
+        font-size: 16px;
+    }
+    .hide-modal-name {
+        flex: 1;
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    .hide-modal-action {
+        padding: 10px 20px;
+        border: none;
+        border-radius: var(--radius-md);
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        color: var(--danger-color);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: var(--shadow-sm);
+    }
+    .hide-modal-action:hover {
+        background: var(--danger-color);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    }
+
+    .user-list::-webkit-scrollbar {
+        width: 6px;
+    }
+    .user-list::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .user-list::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, #d1d5db 0%, #9ca3af 100%);
+        border-radius: 3px;
+    }
+    .user-list::-webkit-scrollbar-thumb:hover {
+        background: var(--primary-color);
+    }
+
+    @@media (max-width: 600px) {
+        .chat-header {
+            padding: 18px 20px;
+        }
+        .header-left h1 {
+            font-size: 22px;
+        }
+        .logo-icon {
+            width: 42px;
+            height: 42px;
+            font-size: 18px;
+        }
+        .back-btn, .settings-btn {
+            width: 40px;
+            height: 40px;
+        }
+        .user-item {
+            padding: 16px 20px;
+            gap: 14px;
+        }
+        .user-item:hover {
+            padding-left: 26px;
+        }
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            font-size: 18px;
+        }
+        .hide-modal-content {
+            width: 92%;
+            max-height: 75vh;
+        }
+    }
+</style>
+
+<script>
+    const currentUserId = parseInt('@User.FindFirstValue(ClaimTypes.NameIdentifier)');
+
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/chatHub")
+        .build();
+
+    connection.start()
+        .then(function () {
+            return connection.invoke("RegisterUser", currentUserId);
+        })
+        .catch(err => console.error("Connection failed: ", err));
+
+    connection.on("UserStatusChanged", function (userId, isOnline, lastSeen) {
+        const userItems = document.querySelectorAll('.user-item');
+        userItems.forEach(function (item) {
+            const onclick = item.getAttribute('onclick');
+            if (onclick && onclick.includes('/Chat/Chat/' + userId)) {
+                let indicator = item.querySelector('.online-indicator');
+                if (isOnline) {
+                    if (!indicator) {
+                        const wrapper = item.querySelector('.user-avatar-wrapper');
+                        if (wrapper) {
+                            indicator = document.createElement('span');
+                            indicator.className = 'online-indicator';
+                            wrapper.appendChild(indicator);
+                        }
+                    }
+                } else {
+                    if (indicator) indicator.remove();
+                }
+            }
+        });
+    });
+
+    function showHideUserModal() {
+        document.getElementById('hideUserModal').classList.add('active');
+    }
+    function closeHideUserModal() {
+        document.getElementById('hideUserModal').classList.remove('active');
+    }
+    function showHideGroupModal() {
+        document.getElementById('hideGroupModal').classList.add('active');
+    }
+    function closeHideGroupModal() {
+        document.getElementById('hideGroupModal').classList.remove('active');
+    }
+
+    async function hideUser(userId) {
+        try {
+            await fetch('/Chat/ToggleHideUser?hiddenUserId=' + userId, { method: 'POST' });
+            location.reload();
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    async function hideGroup(groupId) {
+        try {
+            await fetch('/Chat/ToggleHideGroup?groupId=' + groupId, { method: 'POST' });
+            location.reload();
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    async function unhideUser(userId) {
+        try {
+            await fetch('/Chat/ToggleHideUser?hiddenUserId=' + userId, { method: 'POST' });
+            location.reload();
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    async function unhideGroup(groupId) {
+        try {
+            await fetch('/Chat/ToggleHideGroup?groupId=' + groupId, { method: 'POST' });
+            location.reload();
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    document.addEventListener("click", function (e) {
+        const userModal = document.getElementById('hideUserModal');
+        const groupModal = document.getElementById('hideGroupModal');
+        if (userModal.classList.contains('active') && e.target === userModal) {
+            userModal.classList.remove('active');
+        }
+        if (groupModal.classList.contains('active') && e.target === groupModal) {
+            groupModal.classList.remove('active');
+        }
+    });
+</script>

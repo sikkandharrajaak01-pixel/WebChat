@@ -1,0 +1,767 @@
+@model Chat_App.Models.UsersList
+@{
+    ViewData["Title"] = "Register";
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Chat App</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+<div class="register-page">
+    <div class="bg-grid"></div>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <div class="register-wrapper">
+        <div class="register-card">
+
+            <!-- Step Indicator — 4 dots -->
+            <div class="step-indicator">
+                <div class="step-dot active" id="dot1"></div>
+                <div class="step-line" id="line1"></div>
+                <div class="step-dot" id="dot2"></div>
+                <div class="step-line" id="line2"></div>
+                <div class="step-dot" id="dot3"></div>
+                <div class="step-line" id="line3"></div>
+                <div class="step-dot" id="dot4"></div>
+            </div>
+
+            <!-- ═══════════════ STEP 1 — Credentials ═══════════════ -->
+            <div id="step1" class="step-panel">
+                <div class="card-head">
+                    <div class="icon-ring">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="white" viewBox="0 0 16 16">
+                            <path d="M1 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+                            <path fill-rule="evenodd" d="M13.5 5a.5.5 0 0 1 .5.5V7h1.5a.5.5 0 0 1 0 1H14v1.5a.5.5 0 0 1-1 0V8h-1.5a.5.5 0 0 1 0-1H13V5.5a.5.5 0 0 1 .5-.5z"/>
+                        </svg>
+                    </div>
+                    <h2>Create Account</h2>
+                    <p>Step 1 of 4 — Your credentials</p>
+                </div>
+
+                <div class="three-col-grid">
+                    <div class="field-block">
+                        <label class="field-label">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2Zm13 2.383-4.758 2.855L15 11.114v-5.73Zm-.034 6.878L9.271 8.82 8 9.583 6.728 8.82l-5.694 3.44A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.739ZM1 11.114l4.758-2.876L1 5.383v5.73Z"/></svg>
+                            Email
+                        </label>
+                        <input type="email" id="Email" name="Email" class="field-input" placeholder="you@example.com" autocomplete="off" required value="@Model?.email" />
+                        <span class="field-error" id="emailError">@ViewBag.EmailError</span>
+                    </div>
+                    <div class="field-block">
+                        <label class="field-label">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg>
+                            Password
+                        </label>
+                        <div class="pw-wrap">
+                            <input type="password" id="Password" name="Password" class="field-input" placeholder="Min. 6 chars" autocomplete="new-password" required />
+                        </div>
+                        <span class="field-error" id="passwordError"></span>
+                    </div>
+                    <div class="field-block">
+                        <label class="field-label">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg>
+                            Confirm Password
+                        </label>
+                        <div class="pw-wrap">
+                            <input type="password" id="ConfirmPassword" name="ConfirmPassword" class="field-input" placeholder="Repeat password" autocomplete="new-password" required />
+                            <button type="button" class="pw-eye" onclick="togglePw('ConfirmPassword', this)">
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/></svg>
+                            </button>
+                        </div>
+                        <span class="field-error" id="confirmError"></span>
+                    </div>
+                </div>
+
+                <button type="button" class="btn-primary-action" id="step1Btn" onclick="goToStep2()">
+    <span id="step1BtnText">Continue</span>
+    <svg id="step1BtnIcon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"/></svg>
+</button>
+                <p class="signin-link">Already have an account? <a asp-controller="Account" asp-action="Login">Sign In</a></p>
+            </div>
+
+            <!-- ═══════════════ STEP 2 — Username ═══════════════ -->
+            <div id="step2" class="step-panel hidden">
+                <div class="card-head">
+                    <div class="icon-ring icon-ring--violet">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="white" viewBox="0 0 16 16"><path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3Zm5-6a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z"/></svg>
+                    </div>
+                    <h2>Pick a Username</h2>
+                    <p class="username-hint">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right:5px;color:#a78bfa;"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+                        How others will find and see you in Chat App
+                    </p>
+                </div>
+
+                <div class="username-field-wrap">
+                    <label class="field-label">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3Zm5-6a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z"/></svg>
+                        Username
+                    </label>
+                    <div class="username-input-row">
+                        <span class="at-badge">@@</span>
+                        <input type="text" id="Username" class="field-input username-input" placeholder="Choose a unique username" value="@Model?.username" required />
+                    </div>
+                    <span class="field-hint">Letters, numbers, and underscores only.</span>
+                    <span class="field-error" id="usernameError"></span>
+                    @if (ViewBag.ErrorMessage != null)
+                    {
+                        <div class="alert-error" role="alert">@ViewBag.ErrorMessage</div>
+                    }
+                </div>
+
+                <div class="step-actions">
+                    <button type="button" class="btn-back" onclick="goToStep(1)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/></svg>
+                        Back
+                    </button>
+                    <button type="button" class="btn-primary-action btn-flex" onclick="goToStep3()">
+                        <span>Next</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ═══════════════ STEP 3 — Profile Photo ═══════════════ -->
+            <div id="step3" class="step-panel hidden">
+                <div class="card-head">
+                    <div class="icon-ring icon-ring--teal">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 16 16"><path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/><path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2h-12zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1h12z"/></svg>
+                    </div>
+                    <h2>Profile Photo</h2>
+                    <p>Step 3 of 4 — Add a photo so people know it's you</p>
+                </div>
+
+                <!-- Avatar Preview + Upload Zone -->
+                <div class="photo-upload-area">
+                    <div class="avatar-preview" id="avatarPreview">
+                        <div class="avatar-placeholder" id="avatarPlaceholder">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="rgba(255,255,255,0.3)" viewBox="0 0 16 16"><path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3Zm5-6a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z"/></svg>
+                        </div>
+                        <img id="avatarImg" src="" alt="Profile preview" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:50%;" />
+                        <label class="avatar-overlay" for="photoFileInput" title="Change photo">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="white" viewBox="0 0 16 16"><path d="M15 12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h1.172a3 3 0 0 0 2.12-.879l.83-.828A1 1 0 0 1 6.827 3h2.344a1 1 0 0 1 .707.293l.828.828A3 3 0 0 0 12.828 5H14a1 1 0 0 1 1 1v6zM2 4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1.172a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 9.172 2H6.828a2 2 0 0 0-1.414.586l-.828.828A2 2 0 0 1 3.172 4H2z"/><path d="M8 11a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5zm0 1a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/></svg>
+                        </label>
+                    </div>
+
+
+                    <div class="photo-info">
+                        <p class="photo-title" id="photoTitle">Upload a profile picture</p>
+                        <p class="photo-hint">JPG, PNG or GIF · Max 5MB</p>
+                        <label for="photoFileInput" class="btn-upload">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/></svg>
+                            Choose Photo
+                        </label>
+                        <button type="button" class="btn-remove-photo hidden" id="btnRemovePhoto" onclick="removePhoto()">Remove</button>
+                    </div>
+                </div>
+
+                <span class="field-error" id="photoError"></span>
+
+                <div class="step-actions">
+                    <button type="button" class="btn-back" onclick="goToStep(2)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/></svg>
+                        Back
+                    </button>
+                    <button type="button" class="btn-skip" onclick="skipPhoto()">
+                        Skip for now
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.146 3.646a.5.5 0 0 0 0 .708L7.793 8l-3.647 3.646a.5.5 0 0 0 .708.708l4-4a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708 0zM11.5 3a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-1 0v-9a.5.5 0 0 1 .5-.5z"/></svg>
+                    </button>
+                    <button type="button" class="btn-primary-action btn-flex" onclick="goToStep4()">
+                        <span>Next</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ═══════════════ STEP 4 — Name & Gender ═══════════════ -->
+            <div id="step4" class="step-panel hidden">
+                <form asp-action="Register" method="post" id="registerForm" enctype="multipart/form-data">
+                    <input type="hidden" id="hiddenEmail" name="Email" value="@Model?.email" />
+                    <input type="hidden" id="hiddenPassword" name="Password" />
+                    <input type="hidden" id="hiddenConfirmPassword" name="ConfirmPassword" />
+                    <input type="hidden" id="hiddenUsername" name="Username" value="@Model?.username" />
+                    <input type="hidden" id="hiddenPhotoSkipped" name="PhotoSkipped" value="false" />
+                    <input type ="hidden" id="hiddenFullName" name="Name" value="" />
+                    <input type="hidden" id="hiddenNickName" name="NickName" value="" />
+                    <input type="hidden" id="hiddenGender" name="Gender" value="" />
+                                       <input type="file" id="photoFileInput" name="ProfilePhoto" accept="image/*" class="hidden-file-input" onchange="handlePhotoSelect(event)" />
+
+                    <div class="card-head">
+                        <div class="icon-ring icon-ring--green">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                        </div>
+                        <h2>Almost There!</h2>
+                        <p>Step 4 of 4 — Tell us a little about yourself</p>
+                    </div>
+
+                    <div class="two-col-grid">
+                        <!-- Full Name -->
+                        <div class="field-block">
+                            <label class="field-label" for="FullName">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3Zm5-6a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z"/></svg>
+                                Full Name
+                            </label>
+                            <input type="text" id="FullName" name="FullName" class="field-input" placeholder="Your display name" required />
+                            <span class="field-error" id="fullnameError"></span>
+                        </div>
+                        <!-- Display Name / Nickname -->
+                        <div class="field-block">
+                            <label class="field-label" for="Nickname">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 1a2 2 0 0 1 2 2v.5h1.5a.5.5 0 0 1 0 1H10v.5a2 2 0 0 1-4 0V4.5H4.5a.5.5 0 0 1 0-1H6V3a2 2 0 0 1 2-2zM6.5 3v1.5a1.5 1.5 0 0 0 3 0V3a1.5 1.5 0 0 0-3 0z"/><path d="M13 5.5a.5.5 0 0 1 .5.5v2h1a.5.5 0 0 1 0 1h-1v2a.5.5 0 0 1-1 0v-2h-1a.5.5 0 0 1 0-1h1V6a.5.5 0 0 1 .5-.5z"/></svg>
+                                Nickname <span class="optional-tag">optional</span>
+                            </label>
+                            <input type="text" id="Nickname" name="Nickname" class="field-input" placeholder="What friends call you" />
+                        </div>
+                    </div>
+
+                    <!-- Gender -->
+                    <div class="field-block" style="margin-bottom: 1.75rem;">
+                        <label class="field-label">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 1a4 4 0 1 0 0 8A4 4 0 0 0 8 1zM3 5a5 5 0 1 1 5.5 4.975V12h2a.5.5 0 0 1 0 1h-2v2.5a.5.5 0 0 1-1 0V13h-2a.5.5 0 0 1 0-1h2V9.975A5 5 0 0 1 3 5z"/></svg>
+                            Gender
+                        </label>
+                        <input type="hidden" id="GenderInput" name="Gender" value="" />
+                        <div class="gender-grid">
+                            <button type="button" class="gender-card" data-value="male" onclick="selectGender(this)">
+                                <span class="gender-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M9.5 2a.5.5 0 0 1 0-1h5a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0V2.707L9.871 6.836a5 5 0 1 1-.707-.707L13.293 2H9.5zM6 6a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>
+                                </span>
+                                <span class="gender-label">Male</span>
+                            </button>
+                            <button type="button" class="gender-card" data-value="female" onclick="selectGender(this)">
+                                <span class="gender-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 1a4 4 0 1 0 0 8A4 4 0 0 0 8 1zM3 5a5 5 0 1 1 5.5 4.975V12h2a.5.5 0 0 1 0 1h-2v2.5a.5.5 0 0 1-1 0V13h-2a.5.5 0 0 1 0-1h2V9.975A5 5 0 0 1 3 5z"/></svg>
+                                </span>
+                                <span class="gender-label">Female</span>
+                            </button>
+                            <button type="button" class="gender-card" data-value="non-binary" onclick="selectGender(this)">
+                                <span class="gender-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16"><path d="M8 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/><path fill-rule="evenodd" d="M8 0a.5.5 0 0 1 .5.5v1.025A5.003 5.003 0 0 1 12.95 5.5h1.55a.5.5 0 0 1 0 1h-1.55a5.003 5.003 0 0 1-4.45 3.975V12h2a.5.5 0 0 1 0 1h-2v2.5a.5.5 0 0 1-1 0V13h-2a.5.5 0 0 1 0-1h2V10.475A5.003 5.003 0 0 1 3.05 6.5H1.5a.5.5 0 0 1 0-1h1.55A5.003 5.003 0 0 1 7.5 1.525V.5A.5.5 0 0 1 8 0z"/></svg>
+                                </span>
+                                <span class="gender-label">Non-binary</span>
+                            </button>
+                            <button type="button" class="gender-card" data-value="prefer-not" onclick="selectGender(this)">
+                                <span class="gender-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16"><path d="M5 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg>
+                                </span>
+                                <span class="gender-label">Prefer not to say</span>
+                            </button>
+                        </div>
+                        <span class="field-error" id="genderError"></span>
+                    </div>
+
+                    <div class="step-actions">
+                        <button type="button" class="btn-back" onclick="goToStep(3)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/></svg>
+                            Back
+                        </button>
+                        <button type="submit" class="btn-primary-action btn-complete btn-flex">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                            <span>Complete Setup</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body { font-family: 'Sora', sans-serif; background: #0a0a12; }
+
+    .register-page {
+        min-height: 100vh; height: 100vh;
+        background: radial-gradient(ellipse at 20% 20%, #1a0533 0%, #0a0a12 50%, #001428 100%);
+        display: flex; align-items: center; justify-content: center;
+        position: relative; overflow: hidden; padding: 2rem 1rem;
+    }
+    .register-wrapper {
+        position: relative; z-index: 2; width: 100%;
+        max-width: 780px; max-height: calc(100vh - 4rem); overflow: auto;
+    }
+    .bg-grid {
+        position: absolute; inset: 0;
+        background-image: linear-gradient(rgba(102,126,234,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(102,126,234,0.06) 1px, transparent 1px);
+        background-size: 40px 40px;
+        mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+    }
+    .orb { position: absolute; border-radius: 50%; filter: blur(80px); animation: drift 18s ease-in-out infinite; }
+    .orb-1 { width: 400px; height: 400px; background: rgba(102,126,234,0.18); top: -100px; left: -100px; }
+    .orb-2 { width: 300px; height: 300px; background: rgba(167,139,250,0.15); bottom: -80px; right: -80px; animation-delay: -6s; }
+    .orb-3 { width: 200px; height: 200px; background: rgba(52,211,153,0.1); top: 50%; left: 60%; animation-delay: -12s; }
+    @@keyframes drift { 0%,100%{transform:translate(0,0)} 33%{transform:translate(40px,-30px)} 66%{transform:translate(-20px,40px)} }
+
+    .register-card {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 24px; padding: 2.5rem 2.5rem 2rem;
+        backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+        box-shadow: 0 32px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    /* ── Step Indicator ── */
+    .step-indicator { display: flex; align-items: center; justify-content: center; margin-bottom: 2rem; }
+    .step-dot {
+        width: 10px; height: 10px; border-radius: 50%;
+        background: rgba(255,255,255,0.2); transition: all 0.4s ease; flex-shrink: 0;
+    }
+    .step-dot.active { background: #667eea; box-shadow: 0 0 12px rgba(102,126,234,0.6); transform: scale(1.3); }
+    .step-dot.done { background: #34d399; box-shadow: 0 0 10px rgba(52,211,153,0.5); }
+    .step-line { width: 50px; height: 2px; background: rgba(255,255,255,0.1); transition: background 0.5s ease; flex-shrink: 0; }
+    .step-line.active { background: linear-gradient(90deg, #667eea, #a78bfa); }
+
+    /* ── Card Header ── */
+    .card-head { text-align: center; margin-bottom: 2rem; }
+    .icon-ring {
+        width: 64px; height: 64px;
+        background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 50%;
+        display: inline-flex; align-items: center; justify-content: center;
+        margin-bottom: 1rem; box-shadow: 0 8px 24px rgba(102,126,234,0.35);
+        animation: halo 3s ease-in-out infinite;
+    }
+    .icon-ring--violet { background: linear-gradient(135deg, #7c3aed, #a78bfa); box-shadow: 0 8px 24px rgba(124,58,237,0.3); }
+    .icon-ring--teal   { background: linear-gradient(135deg, #0d9488, #2dd4bf); box-shadow: 0 8px 24px rgba(13,148,136,0.3); }
+    .icon-ring--green  { background: linear-gradient(135deg, #059669, #34d399); box-shadow: 0 8px 24px rgba(52,211,153,0.3); }
+    @@keyframes halo { 0%,100%{box-shadow:0 8px 24px rgba(102,126,234,0.35)} 50%{box-shadow:0 8px 36px rgba(102,126,234,0.55)} }
+    .card-head h2 { color: white; font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.3rem; }
+    .card-head p  { color: rgba(255,255,255,0.5); font-size: 0.875rem; }
+    .username-hint {
+        display: inline-flex; align-items: center;
+        background: rgba(167,139,250,0.1); border: 1px solid rgba(167,139,250,0.25);
+        border-radius: 8px; padding: 8px 14px;
+        color: rgba(255,255,255,0.75) !important; font-size: 0.85rem !important; margin-top: 0.5rem;
+    }
+
+    /* ── Fields ── */
+    .three-col-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 1.75rem; }
+    .two-col-grid   { display: grid; grid-template-columns: repeat(2,1fr); gap: 1rem; margin-bottom: 1.25rem; }
+    @@media (max-width: 600px) {
+        .three-col-grid,.two-col-grid { grid-template-columns: 1fr; }
+        .register-card { padding: 2rem 1.25rem 1.5rem; }
+    }
+    .field-block { display: flex; flex-direction: column; gap: 6px; }
+    .field-label {
+        display: flex; align-items: center; gap: 6px;
+        color: rgba(255,255,255,0.7); font-size: 0.8rem; font-weight: 600;
+        letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .optional-tag {
+        text-transform: none; font-weight: 400; font-size: 0.72rem;
+        color: rgba(255,255,255,0.35); letter-spacing: 0; margin-left: 2px;
+    }
+    .field-input {
+        width: 100%; background: rgba(255,255,255,0.06);
+        border: 1.5px solid rgba(255,255,255,0.12); border-radius: 10px;
+        color: white; font-family: 'Sora', sans-serif; font-size: 0.9rem;
+        padding: 11px 14px; transition: all 0.25s ease; outline: none;
+    }
+    .field-input::placeholder { color: rgba(255,255,255,0.3); }
+    .field-input:focus { border-color: #667eea; background: rgba(102,126,234,0.08); box-shadow: 0 0 0 3px rgba(102,126,234,0.18); }
+    .field-input.error { border-color: #f87171; box-shadow: 0 0 0 3px rgba(248,113,113,0.15); }
+    .field-error { color: #f87171; font-size: 0.75rem; min-height: 1rem; }
+    .field-hint  { color: rgba(255,255,255,0.35); font-size: 0.78rem; }
+
+    .pw-wrap { position: relative; }
+    .pw-wrap .field-input { padding-right: 40px; }
+    .pw-eye {
+        position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+        background: none; border: none; color: rgba(255,255,255,0.4);
+        cursor: pointer; padding: 4px; display: flex; transition: color 0.2s;
+    }
+    .pw-eye:hover { color: #a78bfa; }
+
+    /* ── Username ── */
+    .username-field-wrap { margin-bottom: 1.75rem; display: flex; flex-direction: column; gap: 8px; }
+    .username-input-row  { position: relative; display: flex; align-items: center; }
+    .at-badge {
+        position: absolute; left: 14px;
+        color: #a78bfa; font-family: 'Space Mono', monospace;
+        font-size: 1rem; font-weight: 700; z-index: 1; pointer-events: none;
+    }
+    .username-input { padding-left: 36px !important; font-size: 1rem !important; padding-top: 13px !important; padding-bottom: 13px !important; }
+
+    /* ── Photo Upload ── */
+    .photo-upload-area {
+        display: flex; align-items: center; gap: 2rem;
+        background: rgba(255,255,255,0.03); border: 1.5px dashed rgba(255,255,255,0.15);
+        border-radius: 16px; padding: 1.5rem 1.75rem; margin-bottom: 1rem;
+        transition: border-color 0.25s ease;
+    }
+    .photo-upload-area:hover { border-color: rgba(102,126,234,0.4); }
+    .avatar-preview {
+        width: 96px; height: 96px; border-radius: 50%; flex-shrink: 0;
+        background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.12);
+        display: flex; align-items: center; justify-content: center; position: relative;
+        overflow: hidden; transition: border-color 0.25s ease;
+    }
+    .avatar-preview:hover { border-color: #667eea; }
+    .avatar-placeholder { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+    .avatar-overlay {
+        position: absolute; inset: 0; border-radius: 50%;
+        background: rgba(0,0,0,0.55); display: flex; align-items: center;
+        justify-content: center; opacity: 0; cursor: pointer; transition: opacity 0.2s ease;
+    }
+    .avatar-preview:hover .avatar-overlay { opacity: 1; }
+    .photo-info { display: flex; flex-direction: column; gap: 6px; }
+    .photo-title { color: white; font-weight: 600; font-size: 0.95rem; }
+    .photo-hint  { color: rgba(255,255,255,0.4); font-size: 0.8rem; }
+    .hidden-file-input { display: none; }
+    .btn-upload {
+        display: inline-flex; align-items: center; gap: 7px;
+        background: rgba(102,126,234,0.15); border: 1.5px solid rgba(102,126,234,0.35);
+        border-radius: 8px; color: #a78bfa; font-family: 'Sora', sans-serif;
+        font-size: 0.82rem; font-weight: 600; padding: 8px 16px;
+        cursor: pointer; transition: all 0.2s ease; width: fit-content;
+    }
+    .btn-upload:hover { background: rgba(102,126,234,0.25); border-color: rgba(102,126,234,0.6); color: white; }
+    .btn-remove-photo {
+        background: none; border: none; color: rgba(248,113,113,0.7);
+        font-family: 'Sora', sans-serif; font-size: 0.78rem; cursor: pointer;
+        padding: 0; width: fit-content; transition: color 0.2s;
+    }
+    .btn-remove-photo:hover { color: #f87171; }
+    @@media (max-width: 500px) {
+        .photo-upload-area { flex-direction: column; align-items: flex-start; gap: 1.25rem; }
+    }
+
+    /* ── Gender Grid ── */
+    .gender-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-top: 4px; }
+    @@media (max-width: 600px) { .gender-grid { grid-template-columns: repeat(2,1fr); } }
+    .gender-card {
+        display: flex; flex-direction: column; align-items: center; gap: 8px;
+        background: rgba(255,255,255,0.04); border: 1.5px solid rgba(255,255,255,0.1);
+        border-radius: 12px; padding: 14px 8px;
+        cursor: pointer; transition: all 0.25s ease; color: rgba(255,255,255,0.6);
+        font-family: 'Sora', sans-serif; font-size: 0.78rem; font-weight: 500;
+    }
+    .btn-primary-action:disabled {
+    opacity: 0.7; cursor: not-allowed; transform: none !important;
+}
+    .gender-card:hover { background: rgba(102,126,234,0.1); border-color: rgba(102,126,234,0.4); color: white; }
+    .gender-card.selected {
+        background: rgba(102,126,234,0.18); border-color: #667eea;
+        color: white; box-shadow: 0 0 0 3px rgba(102,126,234,0.18);
+    }
+    .gender-icon { display: flex; color: inherit; }
+    .gender-label { text-align: center; line-height: 1.3; }
+    .btn-spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white; border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    display: inline-block;
+}
+@@keyframes spin { to { transform: rotate(360deg); } }
+    /* ── Buttons ── */
+    .btn-primary-action {
+        width: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none; border-radius: 12px; color: white;
+        font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 600;
+        padding: 14px 20px; display: flex; align-items: center; justify-content: center;
+        gap: 8px; cursor: pointer; transition: all 0.3s ease; position: relative; overflow: hidden;
+    }
+    .btn-primary-action::after { content:''; position:absolute; inset:0; background:linear-gradient(135deg,rgba(255,255,255,0.12),transparent); opacity:0; transition:opacity 0.3s; }
+    .btn-primary-action:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(102,126,234,0.45); }
+    .btn-primary-action:hover::after { opacity: 1; }
+    .btn-primary-action:active { transform: translateY(0); }
+    .btn-flex { flex: 1; }
+
+    .btn-complete { background: linear-gradient(135deg, #059669 0%, #34d399 100%); }
+    .btn-complete:hover { box-shadow: 0 12px 32px rgba(52,211,153,0.4); }
+
+    .step-actions { display: flex; gap: 10px; align-items: center; margin-top: 0.25rem; }
+    .btn-back {
+        display: flex; align-items: center; gap: 6px;
+        background: rgba(255,255,255,0.06); border: 1.5px solid rgba(255,255,255,0.12);
+        border-radius: 12px; color: rgba(255,255,255,0.6);
+        font-family: 'Sora', sans-serif; font-size: 0.9rem;
+        padding: 14px 18px; cursor: pointer; transition: all 0.25s ease; white-space: nowrap;
+    }
+    .btn-back:hover { background: rgba(255,255,255,0.1); color: white; border-color: rgba(255,255,255,0.25); }
+
+    .btn-skip {
+        display: inline-flex; align-items: center; gap: 5px;
+        background: none; border: 1.5px solid rgba(255,255,255,0.12);
+        border-radius: 12px; color: rgba(255,255,255,0.4);
+        font-family: 'Sora', sans-serif; font-size: 0.82rem; font-weight: 500;
+        padding: 14px 14px; cursor: pointer; transition: all 0.25s ease; white-space: nowrap;
+    }
+    .btn-skip:hover { color: rgba(255,255,255,0.65); border-color: rgba(255,255,255,0.25); }
+
+    .signin-link { text-align: center; color: rgba(255,255,255,0.4); font-size: 0.85rem; margin-top: 1.25rem; }
+    .signin-link a { color: #a78bfa; text-decoration: none; font-weight: 500; transition: color 0.2s; }
+    .signin-link a:hover { color: #c4b5fd; }
+
+    .alert-error {
+        background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.35);
+        border-radius: 8px; color: #fca5a5; padding: 10px 14px;
+        font-size: 0.85rem; margin-top: 4px;
+    }
+
+    /* ── Step Panel Transitions ── */
+    .step-panel { transition: opacity 0.35s ease, transform 0.35s ease; }
+    .hidden { display: none; }
+    @@keyframes slideOut { from{opacity:1;transform:translateX(0)} to{opacity:0;transform:translateX(-30px)} }
+    @@keyframes slideIn  { from{opacity:0;transform:translateX(30px)} to{opacity:1;transform:translateX(0)} }
+</style>
+
+<script>
+    /* ─── Helpers ─── */
+    function togglePw(inputId, btn) {
+        const input = document.getElementById(inputId);
+        input.type = input.type === 'password' ? 'text' : 'password';
+        btn.style.color = input.type === 'text' ? '#a78bfa' : 'rgba(255,255,255,0.4)';
+    }
+
+    function animateStep(hideId, showId, direction) {
+        const hide = document.getElementById(hideId);
+        const show = document.getElementById(showId);
+        hide.style.animation = 'slideOut 0.28s ease forwards';
+        setTimeout(() => {
+            hide.classList.add('hidden');
+            hide.style.animation = '';
+            show.classList.remove('hidden');
+            show.style.animation = 'slideIn 0.35s ease forwards';
+            setTimeout(() => show.style.animation = '', 350);
+        }, 260);
+    }
+
+    function setDot(n, state) { /* state: 'idle' | 'active' | 'done' */
+        const dot = document.getElementById('dot' + n);
+        dot.classList.remove('active', 'done');
+        if (state === 'active') dot.classList.add('active');
+        if (state === 'done')   dot.classList.add('done');
+    }
+    function setLine(n, active) {
+        const line = document.getElementById('line' + n);
+        if (active) line.classList.add('active'); else line.classList.remove('active');
+    }
+    function updateIndicator(step) {
+        for (let i = 1; i <= 4; i++) setDot(i, i < step ? 'done' : i === step ? 'active' : 'idle');
+        for (let i = 1; i <= 3; i++) setLine(i, i < step);
+    }
+
+    /* ─── Step 1 → 2 ─── */
+   function goToStep2() {
+    sessionStorage.setItem('reg_email',    document.getElementById('Email').value);
+    sessionStorage.setItem('reg_password', document.getElementById('Password').value);
+    sessionStorage.setItem('reg_confirm',  document.getElementById('ConfirmPassword').value);
+    const email    = document.getElementById('Email').value.trim();
+    const password = document.getElementById('Password').value;
+    const confirm  = document.getElementById('ConfirmPassword').value;
+    const emailPattern = /^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/;
+    let valid = true;
+    ['emailError','passwordError','confirmError'].forEach(id => document.getElementById(id).textContent = '');
+    ['Email','Password','ConfirmPassword'].forEach(id => document.getElementById(id).classList.remove('error'));
+    if (!email || !emailPattern.test(email)) {
+        document.getElementById('emailError').textContent = 'Enter a valid email address.';
+        document.getElementById('Email').classList.add('error'); valid = false;
+    }
+    if (password.length < 6) {
+        document.getElementById('passwordError').textContent = 'Password must be at least 6 characters.';
+        document.getElementById('Password').classList.add('error'); valid = false;
+    }
+    if (password !== confirm) {
+        document.getElementById('confirmError').textContent = 'Passwords do not match.';
+        document.getElementById('ConfirmPassword').classList.add('error'); valid = false;
+    }
+    if (!valid) return;
+    const btn = document.getElementById('step1Btn');
+    const btnText = document.getElementById('step1BtnText');
+    const btnIcon = document.getElementById('step1BtnIcon');
+    btn.disabled = true;
+    btnText.textContent = 'Verifying…';
+    btnIcon.innerHTML = '<span class="btn-spinner"></span>';
+    function restoreBtn() {
+        btn.disabled = false;
+        btnText.textContent = 'Continue';
+        btnIcon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"/></svg>';
+    }
+    fetch('@Url.Action("CheckEmail", "Account")?email=' + encodeURIComponent(email))
+        .then(r => r.json())
+        .then(data => {
+            if (data.exists) {
+                document.getElementById('emailError').textContent = 'Email already exists.';
+                document.getElementById('Email').classList.add('error');
+                restoreBtn(); return;
+            }
+            if (!data.valid) {
+                document.getElementById('emailError').textContent = 'Email does not appear to be a real mailbox.';
+                document.getElementById('Email').classList.add('error');
+                restoreBtn(); return;
+            }
+            restoreBtn();
+            animateStep('step1', 'step2');
+            updateIndicator(2);
+            setTimeout(() => document.getElementById('Username').focus(), 320);
+        })
+        .catch(() => {
+            document.getElementById('emailError').textContent = 'Unable to verify email right now.';
+            document.getElementById('Email').classList.add('error');
+            restoreBtn();
+        });
+}
+
+    /* ─── Step 2 → 3 ─── */
+    function goToStep3() {
+        const username = document.getElementById('Username').value.trim();
+        document.getElementById('usernameError').textContent = '';
+        document.getElementById('Username').classList.remove('error');
+        if (!username) {
+            document.getElementById('usernameError').textContent = 'Please choose a username.';
+            document.getElementById('Username').classList.add('error'); return;
+        }
+        if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+            document.getElementById('usernameError').textContent = 'Only letters, numbers and underscores.';
+            document.getElementById('Username').classList.add('error'); return;
+        }
+
+        fetch('@Url.Action("CheckUsername", "Account")?username=' + encodeURIComponent(username))
+            .then(r => r.json())
+            .then(data => {
+                if (data.exists) {
+                    document.getElementById('usernameError').textContent = 'Username already exists.';
+                    document.getElementById('Username').classList.add('error'); return;
+                }
+                sessionStorage.setItem('reg_username', username);
+                animateStep('step2', 'step3');
+                updateIndicator(3);
+            })
+            .catch(() => {
+                document.getElementById('usernameError').textContent = 'Unable to verify username right now.';
+                document.getElementById('Username').classList.add('error');
+            });
+    }
+
+    /* ─── Step 3 → 4 (with or without photo) ─── */
+    function goToStep4() {
+        syncHiddenFields();
+        animateStep('step3', 'step4');
+        updateIndicator(4);
+    }
+
+    function skipPhoto() {
+        document.getElementById('hiddenPhotoSkipped').value = 'true';
+        document.getElementById('photoFileInput').value = '';
+        goToStep4();
+    }
+
+    /* ─── Generic back ─── */
+    function goToStep(n) {
+        const current = n + 1;
+        animateStep('step' + current, 'step' + n);
+        updateIndicator(n);
+    }
+
+    /* ─── Photo handling ─── */
+    function handlePhotoSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+            document.getElementById('photoError').textContent = 'File too large. Max 5MB.'; return;
+        }
+        document.getElementById('photoError').textContent = '';
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = document.getElementById('avatarImg');
+            img.src = e.target.result;
+            img.style.display = 'block';
+            document.getElementById('avatarPlaceholder').style.display = 'none';
+            document.getElementById('photoTitle').textContent = file.name.length > 24 ? file.name.substring(0, 22) + '…' : file.name;
+            document.getElementById('btnRemovePhoto').classList.remove('hidden');
+            document.getElementById('hiddenPhotoSkipped').value = 'false';
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function removePhoto() {
+        document.getElementById('photoFileInput').value = '';
+        document.getElementById('avatarImg').style.display = 'none';
+        document.getElementById('avatarImg').src = '';
+        document.getElementById('avatarPlaceholder').style.display = 'flex';
+        document.getElementById('photoTitle').textContent = 'Upload a profile picture';
+        document.getElementById('btnRemovePhoto').classList.add('hidden');
+    }
+
+    /* ─── Gender ─── */
+    function selectGender(btn) {
+        document.querySelectorAll('.gender-card').forEach(c => c.classList.remove('selected'));
+        btn.classList.add('selected');
+        document.getElementById('GenderInput').value = btn.dataset.value;
+        document.getElementById('genderError').textContent = '';
+       
+    }
+
+    /* ─── Sync hidden fields before submit ─── */
+    function syncHiddenFields() {
+        document.getElementById('hiddenEmail').value    = sessionStorage.getItem('reg_email')    || '';
+        document.getElementById('hiddenPassword').value = sessionStorage.getItem('reg_password') || '';
+        document.getElementById('hiddenConfirmPassword').value = sessionStorage.getItem('reg_confirm') || '';
+        document.getElementById('hiddenUsername').value = document.getElementById('Username').value;
+         document.getElementById('hiddenFullName').value  = document.getElementById('FullName').value;
+document.getElementById('hiddenNickName').value  = document.getElementById('Nickname').value;
+document.getElementById('hiddenGender').value    = document.getElementById('GenderInput').value;
+    }
+
+    document.getElementById('registerForm').addEventListener('submit', function(e) {
+        syncHiddenFields();
+        const fullname = document.getElementById('FullName').value.trim();
+        const gender   = document.getElementById('GenderInput').value;
+        let valid = true;
+        document.getElementById('fullnameError').textContent = '';
+        document.getElementById('genderError').textContent   = '';
+        if (!fullname) {
+            document.getElementById('fullnameError').textContent = 'Please enter your full name.';
+            document.getElementById('FullName').classList.add('error'); valid = false;
+        }
+        if (!gender) {
+            document.getElementById('genderError').textContent = 'Please select a gender option.';
+            valid = false;
+        }
+        if (!valid) e.preventDefault();
+else sessionStorage.clear();
+    });
+
+    /* ─── Restore on load ─── */
+    document.addEventListener('DOMContentLoaded', function () {
+         const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('reset') === 'true') {
+        sessionStorage.removeItem('reg_email');
+        sessionStorage.removeItem('reg_password');
+        sessionStorage.removeItem('reg_confirm');
+        sessionStorage.removeItem('reg_username');
+    }
+    const email    = sessionStorage.getItem('reg_email');
+        const password = sessionStorage.getItem('reg_password');
+        const confirm  = sessionStorage.getItem('reg_confirm');
+        const username = sessionStorage.getItem('reg_username');
+        if (email)    document.getElementById('Email').value           = email;
+        if (password) document.getElementById('Password').value        = password;
+        if (confirm)  document.getElementById('ConfirmPassword').value = confirm;
+        if (username) document.getElementById('Username').value        = username;
+
+        // If server returned username error, reopen step 2
+        if (document.querySelector('.alert-error')) {
+            ['step1','step3','step4'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            document.getElementById('step2').classList.remove('hidden');
+            updateIndicator(2);
+        }
+    });
+</script>
+
+</body>
+</html>

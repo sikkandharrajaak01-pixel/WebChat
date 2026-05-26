@@ -1,0 +1,592 @@
+﻿using System.Security.Claims;
+using Chat_App;
+using Chat_App.Models;
+using Chat_App.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
+using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
+using StackExchange.Redis;
+using Microsoft.AspNetCore.Mvc;
+
+[Authorize]
+public class ChatHub : Hub
+{
+    private readonly ApplicationDBContext _db;
+    private readonly IDatabase _redis;
+    private readonly WebPushService _webPush;
+
+    public ChatHub(ApplicationDBContext db, IConnectionMultiplexer redis, WebPushService webPush)
+    {
+        _db = db;
+        _redis = redis.GetDatabase();
+        _webPush = webPush;
+    }
+
+    private async Task SendPushNotification(int userId, string title, string body, string url)
+    {
+        await _webPush.SendNotification(userId, title, body, "/chatapp.png", url);
+    }
+
+    private async Task DeleteMessageCache(int user1, int user2)
+    {
+        var key1 = $"messages:{user1}:{user2}";
+        var key2 = $"messages:{user2}:{user1}";
+        await _redis.KeyDeleteAsync(new RedisKey[] { key1, key2 });
+    }
+
+    public async Task RegisterUser(int userId)
+    {
+        var authenticatedUserId = int.Parse(Context.User.FindFirstValue(ClaimTypes.NameIdentifier));
+        if (userId != authenticatedUserId)
+            return;
+
+        ConnectionManager.UserConnections.AddOrUpdate(userId, Context.ConnectionId, (_, _) => Context.ConnectionId);
+
+        var user = await _db.user.FindAsync(userId);
+        if (user != null)
+        {
+            user.IsOnline = true;
+            user.LastSeen = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+
+            // Mark undelivered messages for this user as delivered
+            var undeliveredMessages = _db.message
+                .Where(m => m.ReceiverId == userId && !m.IsDelivered && !m.BlockedStatus)
+                .ToList();
+
+            foreach (var msg in undeliveredMessages)
+                msg.IsDelivered = true;
+
+            await _db.SaveChangesAsync();
+
+            // Invalidate cache for each affected conversation
+            var affectedSenders = undeliveredMessages.Select(m => m.SenderId).Distinct();
+            foreach (var senderId in affectedSenders)
+                await DeleteMessageCache(senderId, userId);
+
+            // Notify senders: upgrade to double grey tick
+            foreach (var msg in undeliveredMessages)
+            {
+                if (ConnectionManager.UserConnections.TryGetValue(msg.SenderId, out var senderConnId))
+                    await Clients.Client(senderConnId).SendAsync("MessageDelivered", msg.MessageId);
+            }
+
+            // Mark undelivered group messages for this user as delivered
+            var undeliveredGroupRecipients = _db.groupMessageRecipient
+                .Where(r => r.UserId == userId && !r.IsDelivered)
+                .ToList();
+
+            foreach (var recipient in undeliveredGroupRecipients)
+            {
+                recipient.IsDelivered = true;
+                recipient.DeliveredAt = DateTime.UtcNow;
+            }
+
+            await _db.SaveChangesAsync();
+
+            // Notify senders about updated group message delivery status
+            var affectedGroupMsgIds = undeliveredGroupRecipients.Select(r => r.GroupMessageId).Distinct();
+            foreach (var msgId in affectedGroupMsgIds)
+            {
+                var msg = await _db.groupMessage.FindAsync(msgId);
+                if (msg == null) continue;
+
+                var group = await _db.group.FindAsync(msg.GroupId);
+                if (group?.UserIds == null) continue;
+
+                var totalRecipients = group.UserIds.Count - 1;
+                var deliveredCount = await _db.groupMessageRecipient
+                    .CountAsync(r => r.GroupMessageId == msgId && r.IsDelivered);
+                var readCount = await _db.groupMessageRecipient
+                    .CountAsync(r => r.GroupMessageId == msgId && r.IsRead);
+
+                if (ConnectionManager.UserConnections.TryGetValue(msg.SenderId, out var senderConnId))
+                {
+                    await Clients.Client(senderConnId).SendAsync("GroupMessageStatusUpdated",
+                        msgId, msg.GroupId, totalRecipients, deliveredCount, readCount);
+                }
+            }
+
+            await Clients.All.SendAsync("UserStatusChanged", userId, true, DateTime.UtcNow);
+        }
+    }
+
+    public async Task SendMessage(int senderId, int receiverId, string message)
+    {
+        senderId = int.Parse(Context.User.FindFirstValue(ClaimTypes.NameIdentifier));
+
+        // Check if users are friends
+        var friendship = await _db.friendRequests
+            .FirstOrDefaultAsync(f =>
+                (f.SenderId == senderId && f.ReceiverId == receiverId) ||
+                (f.SenderId == receiverId && f.ReceiverId == senderId));
+
+        if (friendship == null || friendship.Status != "Accepted")
+        {
+            // Not friends - don't send the message
+            if (ConnectionManager.UserConnections.TryGetValue(senderId, out var senderConnId))
+                await Clients.Client(senderConnId).SendAsync("ReceiveMessage", senderId, message, -1);
+            return;
+        }
+
+        var receiver = await _db.user.FindAsync(receiverId);
+        var isBlocked = receiver?.BlockedUsers != null
+            && receiver.BlockedUsers.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Contains(senderId.ToString());
+
+        var msg = new Message
+        {
+            SenderId = senderId,
+            ReceiverId = receiverId,
+            Text = message,
+            SentAt = DateTime.UtcNow,
+            BlockedStatus = isBlocked
+        };
+        _db.message.Add(msg);
+        await _db.SaveChangesAsync();
+        await DeleteMessageCache(senderId, receiverId);
+
+        if (isBlocked)
+        {
+            if (ConnectionManager.UserConnections.TryGetValue(senderId, out var sc))
+                await Clients.Client(sc).SendAsync("ReceiveMessage", senderId, message, msg.MessageId);
+            return;
+        }
+
+        if (ConnectionManager.UserConnections.TryGetValue(receiverId, out var receiverConnId))
+        {
+            try
+            {
+                msg.IsDelivered = true;
+                await _db.SaveChangesAsync();
+
+                await Clients.Client(receiverConnId).SendAsync("ReceiveMessage", senderId, message, msg.MessageId);
+
+                if (ConnectionManager.UserConnections.TryGetValue(senderId, out var senderConnId))
+                {
+                    await Clients.Client(senderConnId).SendAsync("ReceiveMessage", senderId, message, msg.MessageId);
+                    await Clients.Client(senderConnId).SendAsync("MessageDelivered", msg.MessageId);
+                }
+            }
+            catch { ConnectionManager.UserConnections.TryRemove(receiverId, out _); }
+        }
+        else
+        {
+            var sender = await _db.user.FindAsync(senderId);
+            if (sender != null)
+            {
+                if (ConnectionManager.UserConnections.TryGetValue(senderId, out var senderConnId))
+                    await Clients.Client(senderConnId).SendAsync("ReceiveMessage", senderId, message, msg.MessageId);
+
+                await SendPushNotification(receiverId, sender.username, message, $"/Chat/Chat/{senderId}");
+            }
+        }
+    }
+
+    public async Task SendFileMessage(int senderId, int receiverId, string filePath, string fileType, string fileName, double? duration = null)
+    {
+        senderId = int.Parse(Context.User.FindFirstValue(ClaimTypes.NameIdentifier));
+
+        // Check if users are friends
+        var friendship = await _db.friendRequests
+            .FirstOrDefaultAsync(f =>
+                (f.SenderId == senderId && f.ReceiverId == receiverId) ||
+                (f.SenderId == receiverId && f.ReceiverId == senderId));
+
+        if (friendship == null || friendship.Status != "Accepted")
+        {
+            // Not friends - don't send the file
+            return;
+        }
+
+        var receiver = await _db.user.FindAsync(receiverId);
+        var isBlocked = receiver?.BlockedUsers != null
+            && receiver.BlockedUsers.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Contains(senderId.ToString());
+
+        var msg = new Message
+        {
+            SenderId = senderId,
+            ReceiverId = receiverId,
+            Text = filePath,
+            SentAt = DateTime.UtcNow,
+            FileType = fileType,
+            FileName = fileName,
+            Duration = duration,
+            BlockedStatus = isBlocked
+        };
+
+        _db.message.Add(msg);
+        await _db.SaveChangesAsync();
+        await DeleteMessageCache(senderId, receiverId);
+
+        if (isBlocked)
+        {
+            if (ConnectionManager.UserConnections.TryGetValue(senderId, out var senderConnId))
+                await Clients.Client(senderConnId).SendAsync("ReceiveFileMessage", senderId, filePath, msg.MessageId, fileType, fileName, duration);
+            return;
+        }
+
+        if (ConnectionManager.UserConnections.TryGetValue(receiverId, out var receiverConnId))
+        {
+            try
+            {
+                msg.IsDelivered = true;
+                await _db.SaveChangesAsync();
+
+                await Clients.Client(receiverConnId).SendAsync("ReceiveFileMessage", senderId, filePath, msg.MessageId, fileType, fileName, duration);
+
+                if (ConnectionManager.UserConnections.TryGetValue(senderId, out var senderConnId))
+                {
+                    await Clients.Client(senderConnId).SendAsync("ReceiveFileMessage", senderId, filePath, msg.MessageId, fileType, fileName, duration);
+                    await Clients.Client(senderConnId).SendAsync("MessageDelivered", msg.MessageId);
+                }
+            }
+            catch
+            {
+                ConnectionManager.UserConnections.TryRemove(receiverId, out _);
+            }
+        }
+        else
+        {
+            var sender = await _db.user.FindAsync(senderId);
+            if (sender != null)
+            {
+                if (ConnectionManager.UserConnections.TryGetValue(senderId, out var senderConnId))
+                    await Clients.Client(senderConnId).SendAsync("ReceiveFileMessage", senderId, filePath, msg.MessageId, fileType, fileName, duration);
+
+                var body = fileType == "image" ? "sent a photo"
+                    : fileType == "video" ? "sent a video"
+                    : fileType == "audio" ? "sent a voice message"
+                    : "sent a document";
+                await SendPushNotification(receiverId, sender.username, body, $"/Chat/Chat/{senderId}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Called when the receiver actually scrolls to / views messages from senderId.
+    /// Fires "MessageRead" per message so the sender sees the blue double tick for each one.
+    /// </summary>
+    public async Task MarkMessagesAsRead(int senderId, int receiverId)
+    {
+        var unreadMessages = _db.message
+            .Where(m => m.SenderId == senderId && m.ReceiverId == receiverId && !m.IsRead && !m.BlockedStatus)
+            .ToList();
+
+        foreach (var msg in unreadMessages)
+            msg.IsRead = true;
+
+        await _db.SaveChangesAsync();
+
+        // Invalidate cache
+        await DeleteMessageCache(senderId, receiverId);
+
+        // Tell the original sender about each read message individually
+        if (ConnectionManager.UserConnections.TryGetValue(senderId, out var senderConnId))
+        {
+            foreach (var msg in unreadMessages)
+                await Clients.Client(senderConnId).SendAsync("MessageRead", msg.MessageId);
+        }
+    }
+
+    private async Task DeleteGroupMessageCache(int groupId)
+    {
+        await _redis.KeyDeleteAsync($"messages:group:{groupId}");
+    }
+
+    public async Task SendGroupMessage(int senderId, int groupId, string message)
+    {
+        var sender = await _db.user.FindAsync(senderId);
+        if (sender == null) return;
+
+        var msg = new GroupMessage
+        {
+            GroupId = groupId,
+            SenderId = senderId,
+            SenderName = sender.username,
+            SenderProfileImage = sender.ProfileImagePath,
+            Text = message,
+            SentAt = DateTime.UtcNow
+        };
+
+        _db.groupMessage.Add(msg);
+        await _db.SaveChangesAsync();
+        await DeleteGroupMessageCache(groupId);
+
+        var group = await _db.group.FindAsync(groupId);
+        if (group?.UserIds == null) return;
+
+        var sendTasks = new List<Task>();
+        foreach (var memberId in group.UserIds)
+        {
+            if (memberId == senderId) continue;
+
+            var recipient = new GroupMessageRecipient
+            {
+                GroupMessageId = msg.GroupMessageId,
+                UserId = memberId
+            };
+            _db.groupMessageRecipient.Add(recipient);
+
+            if (ConnectionManager.UserConnections.TryGetValue(memberId, out var connId))
+            {
+                sendTasks.Add(Clients.Client(connId).SendAsync("ReceiveGroupMessage",
+                    senderId, sender.username, sender.ProfileImagePath, groupId,
+                    message, msg.GroupMessageId, msg.SentAt));
+            }
+            else
+            {
+                sendTasks.Add(SendPushNotification(memberId, group.GroupName, $"{sender.username}: {message}", $"/Chat/GroupChat/{groupId}"));
+            }
+        }
+        await Task.WhenAll(sendTasks);
+        await _db.SaveChangesAsync();
+
+        var totalRecipients = group.UserIds.Count - 1;
+
+        if (ConnectionManager.UserConnections.TryGetValue(senderId, out var senderConnId))
+        {
+            await Clients.Client(senderConnId).SendAsync("ReceiveGroupMessage",
+                senderId, sender.username, sender.ProfileImagePath, groupId,
+                message, msg.GroupMessageId, msg.SentAt);
+            await Clients.Client(senderConnId).SendAsync("GroupMessageStatusUpdated",
+                msg.GroupMessageId, groupId, totalRecipients, 0, 0);
+        }
+    }
+
+    public async Task SendGroupFileMessage(int senderId, int groupId, string filePath, string fileType, string fileName, double? duration = null)
+    {
+        var sender = await _db.user.FindAsync(senderId);
+        if (sender == null) return;
+
+        var msg = new GroupMessage
+        {
+            GroupId = groupId,
+            SenderId = senderId,
+            SenderName = sender.username,
+            SenderProfileImage = sender.ProfileImagePath,
+            Text = filePath,
+            SentAt = DateTime.UtcNow,
+            FileType = fileType,
+            FileName = fileName,
+            Duration = duration
+        };
+
+        _db.groupMessage.Add(msg);
+        await _db.SaveChangesAsync();
+        await DeleteGroupMessageCache(groupId);
+
+        var group = await _db.group.FindAsync(groupId);
+        if (group?.UserIds == null) return;
+
+        var sendTasks = new List<Task>();
+        foreach (var memberId in group.UserIds)
+        {
+            if (memberId == senderId) continue;
+
+            var recipient = new GroupMessageRecipient
+            {
+                GroupMessageId = msg.GroupMessageId,
+                UserId = memberId
+            };
+            _db.groupMessageRecipient.Add(recipient);
+
+            if (ConnectionManager.UserConnections.TryGetValue(memberId, out var connId))
+            {
+                sendTasks.Add(Clients.Client(connId).SendAsync("ReceiveGroupFileMessage",
+                    senderId, sender.username, sender.ProfileImagePath, groupId,
+                    filePath, msg.GroupMessageId, fileType, fileName, msg.SentAt, duration));
+            }
+            else
+            {
+                var body = fileType == "image" ? $"{sender.username} sent a photo"
+                    : fileType == "video" ? $"{sender.username} sent a video"
+                    : fileType == "audio" ? $"{sender.username} sent a voice message"
+                    : $"{sender.username} sent a document";
+                sendTasks.Add(SendPushNotification(memberId, group.GroupName, body, $"/Chat/GroupChat/{groupId}"));
+            }
+        }
+        await Task.WhenAll(sendTasks);
+        await _db.SaveChangesAsync();
+
+        var totalRecipients = group.UserIds.Count - 1;
+        if (ConnectionManager.UserConnections.TryGetValue(senderId, out var senderConnId))
+        {
+            await Clients.Client(senderConnId).SendAsync("ReceiveGroupFileMessage",
+                senderId, sender.username, sender.ProfileImagePath, groupId,
+                filePath, msg.GroupMessageId, fileType, fileName, msg.SentAt, duration);
+            await Clients.Client(senderConnId).SendAsync("GroupMessageStatusUpdated",
+                msg.GroupMessageId, groupId, totalRecipients, 0, 0);
+        }
+    }
+    public async Task CallUser(int receiverId, string type)
+    {
+        var callerId = int.Parse(Context.User.FindFirstValue(ClaimTypes.NameIdentifier));
+        var caller = await _db.user.FindAsync(callerId);
+        if (caller == null) return;
+        if (ConnectionManager.UserConnections.TryGetValue(receiverId, out var receiverConnId))
+        {
+            await Clients.Client(receiverConnId).SendAsync("IncomingCall",
+                callerId,
+                caller.Name ?? caller.username,
+                caller.ProfileImagePath ?? "",
+                type);
+        }
+    }
+    public async Task AnswerCall(int callerId, bool accept)
+    {
+        var responderId = int.Parse(Context.User.FindFirstValue(ClaimTypes.NameIdentifier));
+        var responder = await _db.user.FindAsync(responderId);
+        if (responder == null) return;
+        if (ConnectionManager.UserConnections.TryGetValue(callerId, out var callerConnId))
+        {
+            if (accept)
+                await Clients.Client(callerConnId).SendAsync("CallAccepted", responderId, responder.Name ?? responder.username);
+            else
+                await Clients.Client(callerConnId).SendAsync("CallDeclined", responderId, "declined");
+        }
+    }
+    public async Task SendOffer(int receiverId, string sdp)
+    {
+        if (ConnectionManager.UserConnections.TryGetValue(receiverId, out var connId))
+            await Clients.Client(connId).SendAsync("ReceiveOffer", sdp);
+    }
+    public async Task SendAnswer(int callerId, string sdp)
+    {
+        if (ConnectionManager.UserConnections.TryGetValue(callerId, out var connId))
+            await Clients.Client(connId).SendAsync("ReceiveAnswer", sdp);
+    }
+    public async Task SendIceCandidate(int receiverId, string candidate)
+    {
+        if (ConnectionManager.UserConnections.TryGetValue(receiverId, out var connId))
+            await Clients.Client(connId).SendAsync("ReceiveIceCandidate", candidate);
+    }
+    public async Task EndCall(int receiverId)
+    {
+        var senderId = int.Parse(Context.User.FindFirstValue(ClaimTypes.NameIdentifier));
+        if (ConnectionManager.UserConnections.TryGetValue(receiverId, out var connId))
+            await Clients.Client(connId).SendAsync("RemoteHangup", senderId);
+    }
+    public async Task DeleteGroupMessage(int messageId)
+    {
+        var msg = await _db.groupMessage.FindAsync(messageId);
+        if (msg == null) return;
+
+        msg.DeletedStatus = "EveryOne";
+        await _db.SaveChangesAsync();
+        await DeleteGroupMessageCache(msg.GroupId);
+
+        var group = await _db.group.FindAsync(msg.GroupId);
+        if (group?.UserIds == null) return;
+
+        foreach (var memberId in group.UserIds)
+        {
+            if (ConnectionManager.UserConnections.TryGetValue(memberId, out var connId))
+            {
+                try
+                {
+                    await Clients.Client(connId).SendAsync("GroupMessageDeleted", messageId, msg.GroupId);
+                }
+                catch { }
+            }
+        }
+    }
+
+    //[HttpPost]
+    //public async Task<IActionResult> StaredMessage()
+    //{
+
+    //}
+
+    public async Task MarkGroupMessageDelivered(int messageId, int groupId, int userId)
+    {
+        var authenticatedUserId = int.Parse(Context.User.FindFirstValue(ClaimTypes.NameIdentifier));
+        if (userId != authenticatedUserId) return;
+
+        var recipient = await _db.groupMessageRecipient
+            .FirstOrDefaultAsync(r => r.GroupMessageId == messageId && r.UserId == userId);
+        if (recipient == null || recipient.IsDelivered) return;
+
+        recipient.IsDelivered = true;
+        recipient.DeliveredAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        var group = await _db.group.FindAsync(groupId);
+        if (group?.UserIds == null) return;
+
+        var totalRecipients = group.UserIds.Count - 1;
+        var deliveredCount = await _db.groupMessageRecipient
+            .CountAsync(r => r.GroupMessageId == messageId && r.IsDelivered);
+        var readCount = await _db.groupMessageRecipient
+            .CountAsync(r => r.GroupMessageId == messageId && r.IsRead);
+
+        var msg = await _db.groupMessage.FindAsync(messageId);
+        if (msg == null) return;
+
+        if (ConnectionManager.UserConnections.TryGetValue(msg.SenderId, out var senderConnId))
+        {
+            await Clients.Client(senderConnId).SendAsync("GroupMessageStatusUpdated",
+                messageId, groupId, totalRecipients, deliveredCount, readCount);
+        }
+    }
+
+    public async Task MarkGroupMessageRead(int messageId, int groupId, int userId)
+    {
+        var authenticatedUserId = int.Parse(Context.User.FindFirstValue(ClaimTypes.NameIdentifier));
+        if (userId != authenticatedUserId) return;
+
+        var recipient = await _db.groupMessageRecipient
+            .FirstOrDefaultAsync(r => r.GroupMessageId == messageId && r.UserId == userId);
+        if (recipient == null || recipient.IsRead) return;
+
+        recipient.IsRead = true;
+        recipient.ReadAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        var group = await _db.group.FindAsync(groupId);
+        if (group?.UserIds == null) return;
+
+        var totalRecipients = group.UserIds.Count - 1;
+        var deliveredCount = await _db.groupMessageRecipient
+            .CountAsync(r => r.GroupMessageId == messageId && r.IsDelivered);
+        var readCount = await _db.groupMessageRecipient
+            .CountAsync(r => r.GroupMessageId == messageId && r.IsRead);
+
+        var msg = await _db.groupMessage.FindAsync(messageId);
+        if (msg == null) return;
+
+        if (ConnectionManager.UserConnections.TryGetValue(msg.SenderId, out var senderConnId))
+        {
+            await Clients.Client(senderConnId).SendAsync("GroupMessageStatusUpdated",
+                messageId, groupId, totalRecipients, deliveredCount, readCount);
+        }
+    }
+
+    public async Task GetUserStatus(int userId)
+    {
+        var user = await _db.user.FindAsync(userId);
+        if (user != null)
+            await Clients.Caller.SendAsync("UserStatusResponse", userId, user.IsOnline, user.LastSeen);
+    }
+
+    public override async Task OnDisconnectedAsync(Exception? exception)
+    {
+        var user = ConnectionManager.UserConnections.FirstOrDefault(x => x.Value == Context.ConnectionId);
+        if (user.Key != 0)
+        {
+            ConnectionManager.UserConnections.TryRemove(user.Key, out _);
+
+            var dbUser = await _db.user.FindAsync(user.Key);
+            if (dbUser != null)
+            {
+                dbUser.IsOnline = false;
+                dbUser.LastSeen = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+                await Clients.All.SendAsync("UserStatusChanged", user.Key, false, DateTime.UtcNow);
+            }
+        }
+        await base.OnDisconnectedAsync(exception);
+    }
+}

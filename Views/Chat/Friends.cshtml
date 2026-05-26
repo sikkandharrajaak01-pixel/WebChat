@@ -1,0 +1,837 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
+
+<div class="chat-container">
+    <!-- Header -->
+    <div class="chat-header">
+        <div class="header-left">
+            <a href="/Chat/Index" class="back-btn" title="Back to Messages">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div class="logo-icon">
+                <i class="fas fa-user-friends"></i>
+            </div>
+            <h1>Friends</h1>
+        </div>
+        <div class="header-right">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="addFriendsSearch" placeholder="Search users..." onkeyup="filterAddFriends()" />
+            </div>
+            <a href="/Chat/Index" class="logout-btn" title="Back to Messages">
+                <i class="fas fa-comments"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- Friend Requests Tabs -->
+    <div class="friends-tabs">
+        <button class="tab-btn active" onclick="switchTab('all')" id="tabAll">
+            <i class="fas fa-users"></i> All Users
+        </button>
+        <button class="tab-btn" onclick="switchTab('pending')" id="tabPending">
+            <i class="fas fa-user-clock"></i> Requests
+        </button>
+        <button class="tab-btn" onclick="switchTab('sent')" id="tabSent">
+            <i class="fas fa-paper-plane"></i> Sent
+        </button>
+    </div>
+
+    <!-- All Users Section -->
+    <div class="friends-section active" id="sectionAll">
+        <div class="friends-list" id="addFriendsList"></div>
+        <div id="friendsLoader" style="display:flex;justify-content:center;padding:20px;">
+            <div class="spinner"></div>
+        </div>
+    </div>
+
+    <!-- Pending Requests Section -->
+    <div class="friends-section" id="sectionPending">
+        <div class="section-header">
+            <h4>Friend Requests</h4>
+        </div>
+        <div class="friends-list" id="pendingRequestsList"></div>
+    </div>
+
+    <!-- Sent Requests Section -->
+    <div class="friends-section" id="sectionSent">
+        <div class="section-header">
+            <h4>Sent Requests</h4>
+        </div>
+        <div class="friends-list" id="sentRequestsList"></div>
+    </div>
+</div>
+
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    html, body {
+        height: 100%;
+        overflow: hidden;
+    }
+
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        min-height: 100%;
+    }
+
+    .chat-container {
+        max-width: 800px;
+        margin: 0 auto;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%);
+        backdrop-filter: blur(20px);
+        border-radius: 24px;
+        box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4), 0 0 1px rgba(255,255,255,0.1) inset;
+        border: 1px solid rgba(255,255,255,0.08);
+        overflow: hidden;
+    }
+
+    @@media (min-width: 768px) {
+        .chat-container {
+            margin: 30px auto;
+            border-radius: 24px;
+            height: calc(100vh - 60px);
+        }
+    }
+
+    .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 24px 30px;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+        color: white;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        box-shadow: 0 4px 30px rgba(99, 102, 241, 0.4);
+        border-bottom: 1px solid rgba(255,255,255,0.15);
+    }
+
+    .header-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .back-btn {
+        width: 40px;
+        height: 40px;
+        background: rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        text-decoration: none;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .back-btn:hover {
+        background: rgba(255,255,255,0.25);
+        transform: translateX(-3px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    }
+
+    .logo-icon {
+        width: 46px;
+        height: 46px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        animation: pulse 3s ease-in-out infinite;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+
+    .header-left h1 {
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+
+    .header-right {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .search-box {
+        position: relative;
+        background: rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        padding: 10px 18px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .search-box:focus-within {
+        background: rgba(255, 255, 255, 0.2);
+        border-color: rgba(255,255,255,0.3);
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
+    }
+
+    .search-box i {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 14px;
+    }
+
+    .search-box input {
+        background: transparent;
+        border: none;
+        outline: none;
+        color: white;
+        font-size: 14px;
+        width: 200px;
+        font-weight: 500;
+    }
+
+    .search-box input::placeholder {
+        color: rgba(255, 255, 255, 0.5);
+    }
+
+    .logout-btn {
+        width: 44px;
+        height: 44px;
+        background: rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        text-decoration: none;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .logout-btn:hover {
+        background: rgba(99, 102, 241, 0.8);
+        transform: translateY(-2px) scale(1.05);
+        box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+    }
+
+    /* Tabs */
+    .friends-tabs {
+        display: flex;
+        gap: 8px;
+        padding: 16px 30px 0;
+        background: rgba(0,0,0,0.1);
+    }
+
+    .tab-btn {
+        padding: 10px 20px;
+        border: none;
+        background: transparent;
+        color: rgba(255,255,255,0.5);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        border-radius: 12px 12px 0 0;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .tab-btn:hover {
+        color: rgba(255,255,255,0.8);
+        background: rgba(255,255,255,0.05);
+    }
+
+    .tab-btn.active {
+        color: white;
+        background: rgba(255,255,255,0.1);
+    }
+
+    /* Sections */
+    .friends-section {
+        display: none;
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px 30px;
+    }
+
+    .friends-section.active {
+        display: block;
+    }
+
+    .section-header {
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .section-header h4 {
+        font-size: 14px;
+        font-weight: 600;
+        color: rgba(255,255,255,0.7);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .friends-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .add-friend-item {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 16px;
+        border-radius: 16px;
+        transition: 0.2s;
+        cursor: pointer;
+    }
+
+    .add-friend-item:hover {
+        background: rgba(99, 102, 241, 0.15);
+        transform: translateX(4px);
+    }
+
+    .add-friend-avatar {
+        width: 52px;
+        height: 52px;
+        border-radius: 16px;
+        overflow: hidden;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 20px;
+        flex-shrink: 0;
+        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
+    }
+
+    .add-friend-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .add-friend-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .add-friend-name {
+        font-size: 16px;
+        font-weight: 700;
+        color: white;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .add-friend-status {
+        font-size: 13px;
+        color: rgba(255,255,255,0.5);
+        margin-top: 4px;
+    }
+
+    .add-friend-btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .add-friend-btn.send {
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: white;
+    }
+
+    .add-friend-btn.send:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    }
+
+    .add-friend-btn.pending {
+        background: rgba(255,255,255,0.1);
+        color: rgba(255,255,255,0.7);
+        cursor: default;
+    }
+
+    .add-friend-btn.accept {
+        background: linear-gradient(135deg, #10b981, #34d399);
+        color: white;
+    }
+
+    .add-friend-btn.accept:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    .add-friend-btn.reject {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+    }
+
+    .add-friend-btn.reject:hover {
+        background: rgba(239, 68, 68, 0.2);
+        transform: translateY(-1px);
+    }
+
+    .pending-request-item,
+    .sent-request-item {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 16px;
+        border-radius: 16px;
+        background: rgba(255,255,255,0.03);
+        margin-bottom: 4px;
+        transition: 0.2s;
+    }
+
+    .pending-request-item:hover,
+    .sent-request-item:hover {
+        background: rgba(255,255,255,0.06);
+        transform: translateX(4px);
+    }
+
+    .pending-request-item .add-friend-btn,
+    .sent-request-item .add-friend-btn {
+        margin-left: auto;
+    }
+
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 80px 30px;
+        text-align: center;
+    }
+
+    .empty-icon {
+        width: 80px;
+        height: 80px;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+        border-radius: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 32px;
+        margin-bottom: 20px;
+        box-shadow: 0 20px 50px rgba(99, 102, 241, 0.4);
+    }
+
+    .empty-state h3 {
+        font-size: 20px;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 8px;
+        letter-spacing: -0.5px;
+    }
+
+    .empty-state p {
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.5);
+        font-weight: 500;
+    }
+
+    /* Scrollbar */
+    .friends-section::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .friends-section::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .friends-section::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, #6366f1 0%, #8b5cf6 100%);
+        border-radius: 4px;
+    }
+
+    .friends-section::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, #818cf8 0%, #a78bfa 100%);
+    }
+
+    .spinner {
+        width: 36px;
+        height: 36px;
+        border: 3px solid rgba(255,255,255,0.1);
+        border-top-color: #6366f1;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    @@media (max-width: 600px) {
+        .chat-header {
+            padding: 18px 20px;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .header-right {
+            width: 100%;
+            justify-content: space-between;
+        }
+
+        .search-box {
+            flex: 1;
+        }
+
+        .search-box input {
+            width: 100%;
+        }
+
+        .friends-tabs {
+            padding: 12px 20px 0;
+            overflow-x: auto;
+        }
+
+        .tab-btn {
+            padding: 8px 14px;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        .friends-section {
+            padding: 12px 20px;
+        }
+
+        .add-friend-item {
+            padding: 12px;
+        }
+
+        .add-friend-avatar {
+            width: 46px;
+            height: 46px;
+            font-size: 18px;
+        }
+    }
+</style>
+
+<script>
+    const currentUserId = parseInt('@User.FindFirstValue(ClaimTypes.NameIdentifier)');
+    const PAGE_SIZE = 15;
+    let allUsersForFriends = [];
+    let allUsersLoaded = [];
+    let skip = 0;
+    let hasMore = true;
+    let isLoading = false;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        loadPendingRequests();
+        loadSentRequests();
+        loadUsersForFriends(true);
+
+        const sectionAll = document.getElementById('sectionAll');
+        sectionAll.addEventListener('scroll', function() {
+            if (this.scrollTop + this.clientHeight >= this.scrollHeight - 100) {
+                loadUsersForFriends();
+            }
+        });
+    });
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.friends-section').forEach(s => s.classList.remove('active'));
+
+        if (tab === 'all') {
+            document.getElementById('tabAll').classList.add('active');
+            document.getElementById('sectionAll').classList.add('active');
+        } else if (tab === 'pending') {
+            document.getElementById('tabPending').classList.add('active');
+            document.getElementById('sectionPending').classList.add('active');
+            loadPendingRequests();
+        } else if (tab === 'sent') {
+            document.getElementById('tabSent').classList.add('active');
+            document.getElementById('sectionSent').classList.add('active');
+            loadSentRequests();
+        }
+    }
+
+    async function loadUsersForFriends(reset) {
+        if (isLoading) return;
+        if (!reset && !hasMore) return;
+
+        if (reset) {
+            skip = 0;
+            hasMore = true;
+            allUsersLoaded = [];
+        }
+
+        isLoading = true;
+        document.getElementById('friendsLoader').style.display = 'flex';
+
+        try {
+            const response = await fetch(`/Chat/GetAllUsersForFriendRequest?skip=${skip}&take=${PAGE_SIZE}`);
+            const data = await response.json();
+            const users = data.users;
+
+            allUsersLoaded = reset ? users : allUsersLoaded.concat(users);
+            allUsersForFriends = allUsersLoaded;
+            skip += users.length;
+            hasMore = users.length === PAGE_SIZE;
+
+            renderAddFriendsList(allUsersForFriends);
+        } catch (err) {
+            console.error("Failed to load users:", err);
+        } finally {
+            isLoading = false;
+            document.getElementById('friendsLoader').style.display = hasMore ? 'flex' : 'none';
+        }
+    }
+
+    function getFriendStatus(userId) {
+        const user = allUsersForFriends.find(u => u.id === userId);
+        return user ? user.friendshipStatus : { status: "None" };
+    }
+
+    function renderAddFriendsList(users) {
+        const listEl = document.getElementById('addFriendsList');
+        if (users.length === 0) {
+            listEl.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon"><i class="fas fa-user-friends"></i></div>
+                    <h3>No users found</h3>
+                    <p>Try a different search term</p>
+                </div>
+            `;
+            return;
+        }
+
+        listEl.innerHTML = users.map(user => {
+            const status = user.friendshipStatus || { status: "None" };
+            let btnHtml = '';
+            let statusText = '';
+
+            if (status.status === "None") {
+                btnHtml = `<button class="add-friend-btn send" onclick="sendFriendRequest(${user.id})"><i class="fas fa-user-plus"></i> Add Friend</button>`;
+                statusText = user.isOnline ? 'Online' : 'Offline';
+            } else if (status.status === "Pending") {
+                if (status.isSender) {
+                    btnHtml = `<button class="add-friend-btn pending"><i class="fas fa-clock"></i> Request Sent</button>`;
+                    statusText = 'Awaiting response';
+                } else {
+                    btnHtml = `<button class="add-friend-btn accept" onclick="acceptFriendRequestFromList(${user.id})"><i class="fas fa-check"></i> Accept</button>
+                               <button class="add-friend-btn reject" onclick="rejectFriendRequestFromList(${user.id})"><i class="fas fa-times"></i></button>`;
+                    statusText = 'Sent you a request';
+                }
+            } else if (status.status === "Accepted") {
+                btnHtml = `<button class="add-friend-btn pending"><i class="fas fa-check-circle"></i> Friends</button>`;
+                statusText = 'Connected';
+            }
+
+            const initial = user.username.charAt(0).toUpperCase();
+            const avatarHtml = user.profileImagePath
+                ? `<img src="${user.profileImagePath}" alt="${user.username}" />`
+                : `<span>${initial}</span>`;
+
+            return `
+                <div class="add-friend-item" data-user-id="${user.id}">
+                    <div class="add-friend-avatar">${avatarHtml}</div>
+                    <div class="add-friend-info">
+                        <div class="add-friend-name">${user.username}</div>
+                        <div class="add-friend-status">${statusText}</div>
+                    </div>
+                    ${btnHtml}
+                </div>
+            `;
+        }).join('');
+    }
+
+    async function loadPendingRequests() {
+        try {
+            const response = await fetch('/Chat/GetPendingFriendRequests');
+            const requests = await response.json();
+            const list = document.getElementById('pendingRequestsList');
+
+            if (requests.length > 0) {
+                list.innerHTML = requests.map(req => {
+                    const initial = req.senderName.charAt(0).toUpperCase();
+                    const avatarHtml = req.senderProfileImage
+                        ? `<img src="${req.senderProfileImage}" alt="${req.senderName}" />`
+                        : `<span>${initial}</span>`;
+
+                    return `
+                        <div class="pending-request-item">
+                            <div class="add-friend-avatar">${avatarHtml}</div>
+                            <div class="add-friend-info">
+                                <div class="add-friend-name">${req.senderName}</div>
+                                <div class="add-friend-status">Wants to connect</div>
+                            </div>
+                            <button class="add-friend-btn accept" onclick="acceptFriendRequestById(${req.id})"><i class="fas fa-check"></i> Accept</button>
+                            <button class="add-friend-btn reject" onclick="rejectFriendRequestById(${req.id})"><i class="fas fa-times"></i></button>
+                        </div>
+                    `;
+                }).join('');
+                document.getElementById('tabPending').innerHTML = '<i class="fas fa-user-clock"></i> Requests (' + requests.length + ')';
+            } else {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon"><i class="fas fa-inbox"></i></div>
+                        <h3>No pending requests</h3>
+                        <p>When someone sends you a friend request, it will appear here</p>
+                    </div>
+                `;
+                document.getElementById('tabPending').innerHTML = '<i class="fas fa-user-clock"></i> Requests';
+            }
+        } catch (err) {
+            console.error("Failed to load pending requests:", err);
+        }
+    }
+
+    async function loadSentRequests() {
+        try {
+            const response = await fetch('/Chat/GetSentFriendRequests');
+            const requests = await response.json();
+            const list = document.getElementById('sentRequestsList');
+
+            if (requests.length > 0) {
+                list.innerHTML = requests.map(req => {
+                    const initial = req.receiverName.charAt(0).toUpperCase();
+                    const avatarHtml = req.receiverProfileImage
+                        ? `<img src="${req.receiverProfileImage}" alt="${req.receiverName}" />`
+                        : `<span>${initial}</span>`;
+
+                    return `
+                        <div class="sent-request-item">
+                            <div class="add-friend-avatar">${avatarHtml}</div>
+                            <div class="add-friend-info">
+                                <div class="add-friend-name">${req.receiverName}</div>
+                                <div class="add-friend-status">Pending...</div>
+                            </div>
+                            <button class="add-friend-btn pending"><i class="fas fa-clock"></i> Pending</button>
+                        </div>
+                    `;
+                }).join('');
+                document.getElementById('tabSent').innerHTML = '<i class="fas fa-paper-plane"></i> Sent (' + requests.length + ')';
+            } else {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon"><i class="fas fa-paper-plane"></i></div>
+                        <h3>No sent requests</h3>
+                        <p>Friend requests you send will appear here</p>
+                    </div>
+                `;
+                document.getElementById('tabSent').innerHTML = '<i class="fas fa-paper-plane"></i> Sent';
+            }
+        } catch (err) {
+            console.error("Failed to load sent requests:", err);
+        }
+    }
+
+    function filterAddFriends() {
+        const search = document.getElementById('addFriendsSearch').value.toLowerCase();
+        const filtered = allUsersLoaded.filter(u => u.username.toLowerCase().includes(search));
+        renderAddFriendsList(filtered);
+    }
+
+    async function sendFriendRequest(userId) {
+        try {
+            const response = await fetch(`/Chat/SendFriendRequest?receiverId=${userId}`, {
+                method: 'POST'
+            });
+            if (response.ok) {
+                const user = allUsersLoaded.find(u => u.id === userId);
+                if (user) {
+                    user.friendshipStatus = { status: "Pending", isSender: true };
+                }
+                renderAddFriendsList(allUsersLoaded);
+            }
+        } catch (err) {
+            console.error("Failed to send request:", err);
+        }
+    }
+
+    async function acceptFriendRequestById(requestId) {
+        try {
+            const response = await fetch(`/Chat/AcceptFriendRequest?requestId=${requestId}`, {
+                method: 'POST'
+            });
+            if (response.ok) {
+                await loadPendingRequests();
+                await loadUsersForFriends(true);
+                loadSentRequests();
+            }
+        } catch (err) {
+            console.error("Failed to accept request:", err);
+        }
+    }
+
+    async function rejectFriendRequestById(requestId) {
+        try {
+            const response = await fetch(`/Chat/RejectFriendRequest?requestId=${requestId}`, {
+                method: 'POST'
+            });
+            if (response.ok) {
+                await loadPendingRequests();
+            }
+        } catch (err) {
+            console.error("Failed to reject request:", err);
+        }
+    }
+
+    async function acceptFriendRequestFromList(userId) {
+        const status = getFriendStatus(userId);
+        if (status && status.requestId) {
+            await acceptFriendRequestById(status.requestId);
+        }
+    }
+
+    async function rejectFriendRequestFromList(userId) {
+        const status = getFriendStatus(userId);
+        if (status && status.requestId) {
+            await rejectFriendRequestById(status.requestId);
+        }
+    }
+
+    // SignalR connection for real-time friend request updates
+    const friendsConnection = new signalR.HubConnectionBuilder()
+        .withUrl("/chatHub")
+        .build();
+
+    friendsConnection.start()
+        .then(() => {
+            return friendsConnection.invoke("RegisterUser", currentUserId);
+        })
+        .catch(err => console.error("Friends connection failed:", err));
+
+    friendsConnection.on("FriendRequestReceived", function(senderId) {
+        loadPendingRequests();
+    });
+
+    friendsConnection.on("FriendRequestAccepted", function(userId) {
+        loadSentRequests();
+        loadUsersForFriends(true);
+    });
+</script>

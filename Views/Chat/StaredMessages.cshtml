@@ -1,0 +1,486 @@
+﻿@model List<StarMessageDto>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+<div class="chat-container">
+    <div class="chat-header">
+        <div class="header-left">
+            <a href="/Chat/Index" class="back-btn">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div class="logo-icon">
+                <i class="fas fa-star"></i>
+            </div>
+            <h1>Starred Messages</h1>
+        </div>
+    </div>
+
+    <div class="messages-list">
+        @if (!Model.Any())
+        {
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-star"></i>
+                </div>
+                <h3>No starred messages</h3>
+                <p>Star a message to find it here</p>
+            </div>
+        }
+        else
+        {
+            foreach (var item in Model)
+            {
+                <div class="star-item">
+                   <div class="star-item-top">
+    <div class="star-item-meta">
+        <i class="fas @(item.MessageType == "Group" ? "fa-users" : "fa-user")"></i>
+
+        <span class="star-item-sender">
+            @(item.MessageType == "Group" ? $"{item.SenderName}" : "Personal Message")
+        </span>
+    </div>
+
+    <div class="star-right-section">
+        <span class="star-item-time">
+            @item.SentAt.ToString("dd MMM yyyy hh:mm tt")
+        </span>
+
+        <button class="unstar-btn"
+                onclick="removeStar(@item.Id,'@item.MessageType')">
+            <i class="fas fa-trash"></i>
+        </button>
+    </div>
+</div>
+
+                    @if (!string.IsNullOrEmpty(item.Text) && string.IsNullOrEmpty(item.FileName))
+                    {
+                        <div class="star-item-text">@item.Text</div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(item.FileName))
+                    {
+                        <div class="star-item-file">
+                            <div class="file-info-row">
+                                @{
+                                    var fileIcon = "fa-file";
+                                    if (!string.IsNullOrEmpty(item.FileType))
+                                    {
+                                        if (item.FileType == "image") fileIcon = "fa-file-image";
+                                        else if (item.FileType == "video") fileIcon = "fa-file-video";
+                                    }
+                                }
+                                <i class="fas @fileIcon"></i>
+                                <span class="file-name">@item.FileName</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(item.Text) && item.FileType == "image")
+                            {
+                                <div class="file-image-preview">
+                                    <img src="@item.Text" alt="@item.FileName" onclick="window.open(this.src)" />
+                                </div>
+                            }
+                            @if (!string.IsNullOrEmpty(item.Text))
+                            {
+                                <div class="file-path-row">
+                                    <i class="fas fa-link"></i>
+                                    <span class="file-path-text">@item.Text</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    html, body {
+        height: 100%;
+        overflow: hidden;
+    }
+
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        min-height: 100%;
+    }
+    .star-right-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.unstar-btn {
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 10px;
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.unstar-btn:hover {
+    background: rgba(239, 68, 68, 0.25);
+    transform: scale(1.08);
+}
+
+.unstar-btn i {
+    font-size: 14px;
+}
+    .chat-container {
+        max-width: 800px;
+        margin: 0 auto;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%);
+        backdrop-filter: blur(20px);
+        border-radius: 24px;
+        box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4), 0 0 1px rgba(255,255,255,0.1) inset;
+        border: 1px solid rgba(255,255,255,0.08);
+        overflow: hidden;
+    }
+
+    @@media (min-width: 768px) {
+        .chat-container {
+            margin: 30px auto;
+            border-radius: 24px;
+            height: calc(100vh - 60px);
+        }
+    }
+
+    .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 24px 30px;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+        color: white;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        box-shadow: 0 4px 30px rgba(99, 102, 241, 0.4);
+        border-bottom: 1px solid rgba(255,255,255,0.15);
+    }
+
+    .header-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .back-btn {
+        width: 44px;
+        height: 44px;
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        text-decoration: none;
+        font-size: 18px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .back-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateX(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+    }
+
+    .logo-icon {
+        width: 46px;
+        height: 46px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        animation: pulse 3s ease-in-out infinite;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+
+    .header-left h1 {
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+
+    .messages-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 0;
+    }
+
+    .star-item {
+        padding: 20px 30px;
+        margin: 6px 16px;
+        border-radius: 20px;
+        background: rgba(255,255,255,0.04);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid rgba(255,255,255,0.05);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .star-item::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        border-radius: 20px;
+    }
+
+    .star-item:hover {
+        background: rgba(255, 255, 255, 0.06);
+        transform: translateX(8px);
+        border-color: rgba(99, 102, 241, 0.2);
+    }
+
+    .star-item:hover::before {
+        opacity: 1;
+    }
+
+    .star-item-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .star-item-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .star-item-meta i {
+        color: #a855f7;
+        font-size: 14px;
+    }
+
+    .star-item-sender {
+        font-size: 15px;
+        font-weight: 600;
+        color: #fff;
+        letter-spacing: -0.2px;
+    }
+
+    .star-item-time {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.5);
+        font-weight: 500;
+    }
+
+    .star-item-text {
+        font-size: 15px;
+        color: rgba(255, 255, 255, 0.8);
+        line-height: 1.5;
+        padding: 10px 14px;
+        background: rgba(99, 102, 241, 0.1);
+        border-radius: 12px;
+        margin-top: 8px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .star-item-file {
+        margin-top: 10px;
+        padding: 12px 16px;
+        background: rgba(255,255,255,0.05);
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,0.08);
+        position: relative;
+        z-index: 1;
+    }
+
+    .file-info-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+    }
+
+    .file-info-row i {
+        color: #a855f7;
+        font-size: 18px;
+    }
+
+    .file-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: #e2e8f0;
+    }
+
+    .file-image-preview {
+        margin-top: 10px;
+        border-radius: 12px;
+        overflow: hidden;
+        background: rgba(0,0,0,0.2);
+        position: relative;
+        z-index: 1;
+    }
+
+    .file-image-preview img {
+        width: 100%;
+        max-height: 300px;
+        object-fit: contain;
+        display: block;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+    }
+
+    .file-image-preview img:hover {
+        transform: scale(1.02);
+    }
+
+    .file-path-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .file-path-row i {
+        color: rgba(255,255,255,0.4);
+        font-size: 12px;
+        margin-top: 3px;
+        flex-shrink: 0;
+    }
+
+    .file-path-text {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.5);
+        word-break: break-all;
+        line-height: 1.4;
+        font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 100px 30px;
+        text-align: center;
+    }
+
+    .empty-icon {
+        width: 100px;
+        height: 100px;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+        border-radius: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 42px;
+        margin-bottom: 24px;
+        box-shadow: 0 20px 50px rgba(99, 102, 241, 0.4);
+        animation: float 4s ease-in-out infinite;
+    }
+
+    @@keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+
+    .empty-state h3 {
+        font-size: 22px;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 10px;
+        letter-spacing: -0.5px;
+    }
+
+    .empty-state p {
+        font-size: 15px;
+        color: rgba(255, 255, 255, 0.5);
+        font-weight: 500;
+    }
+
+    .messages-list::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .messages-list::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .messages-list::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, #6366f1 0%, #8b5cf6 100%);
+        border-radius: 4px;
+    }
+
+    .messages-list::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, #818cf8 0%, #a78bfa 100%);
+    }
+
+    @@media (max-width: 600px) {
+        .chat-header {
+            padding: 18px 20px;
+        }
+
+        .header-left h1 {
+            font-size: 20px;
+        }
+
+        .star-item {
+            padding: 16px 20px;
+            margin: 4px 12px;
+        }
+
+        .star-item:hover {
+            transform: translateX(4px);
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            font-size: 18px;
+        }
+
+        .back-btn {
+            width: 40px;
+            height: 40px;
+        }
+    }
+</style>
+<script>
+
+    async function removeStar(id, type) {
+
+        var response = await fetch(`/Chat/RemoveStar?messageId=${id}&messageType=${type}`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            location.reload();
+        }
+    }
+</script>

@@ -1,0 +1,523 @@
+﻿@using Chat_App.Models
+@model List<Moment>
+@{
+    ViewData["Title"] = "Moments";
+    var currentUserId = (int)ViewBag.CurrentUserId;
+    var currentUsername = (string)ViewBag.CurrentUsername;
+        var usersDict = ViewBag.Users as Dictionary<int, UsersList>;
+}
+@functions {
+    string GetInitials(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return "?";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2) return (parts[0][0].ToString() + parts[1][0].ToString()).ToUpper();
+        return name.Length >= 2 ? name[..2].ToUpper() : name.ToUpper();
+    }
+}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+<div class="chat-container">
+    <!-- Header -->
+    <div class="chat-header">
+        <div class="header-center">
+            <div class="logo-icon">
+                <i class="fas fa-camera"></i>
+            </div>
+            <h1>Moments</h1>
+        </div>
+        <div class="header-right">
+            <a href="/Account/Logout" class="logout-btn" title="Logout">
+                <i class="fas fa-sign-out-alt"></i>
+            </a>
+        </div>
+    </div>
+    <!-- Tab Navigation -->
+    <div class="tab-nav">
+        <a href="/Chat/Index" class="tab-item">
+            <i class="fas fa-comment-dots"></i> Chats
+        </a>
+        <a href="/Chat/Moments" class="tab-item active">
+            <i class="fas fa-camera"></i> Moments
+        </a>
+    </div>
+    <!-- Moments Body -->
+    <div class="moments-body">
+        <!-- Pulse Bar -->
+        <div class="pulse-bar">
+            <span class="pulse-label">PULSE</span>
+            <div class="pulse-track">
+                <!-- Add Yours -->
+                <div class="pulse-node" onclick="openUpload()">
+                    <div class="pulse-ring add-ring">
+                        <div class="pulse-inner add-inner">
+                            <i class="fas fa-plus"></i>
+                        </div>
+                    </div>
+                    <span class="pulse-name">Add Yours</span>
+                </div>
+                @{
+                    var groupedMoments = Model.GroupBy(m => m.UserId);
+                }
+                @foreach (var group in groupedMoments)
+                {
+                    var userMoments = group.ToList();
+                    var user = userMoments.First();
+                    var hasUnviewed = userMoments.Any(m => !m.Views.Any(v => v.ViewedByUserId == currentUserId));
+                    var ringClass = hasUnviewed ? "live-ring" : "seen-ring";
+                   var initials = GetInitials(usersDict?.ContainsKey(group.Key) == true ? usersDict[group.Key].username : "?");
+                    <div class="pulse-node" onclick="showMomentViewer(@group.Key)">
+                        <div class="pulse-ring @ringClass">
+                            <div class="pulse-inner @(hasUnviewed ? "" : "seen-inner")">@initials</div>
+                        </div>
+                        <span class="pulse-name">@(usersDict?.ContainsKey(group.Key) == true ? usersDict[group.Key].username : "Unknown")</span>
+                    </div>
+                }
+            </div>
+        </div>
+        <div class="feed-divider"></div>
+        <!-- Moments Feed -->
+        <div class="moments-feed" id="momentsFeed">
+            @foreach (var moment in Model)
+            {
+                <div class="moment-card" data-moment-id="@moment.Id" data-user-id="@moment.UserId">
+                    <div class="card-header">
+                        <div class="card-avatar" style="background:linear-gradient(135deg,#6366f1,#a855f7)">
+                            @GetInitials(usersDict?.ContainsKey(moment.UserId) == true ? usersDict[moment.UserId].username : "?")
+                        </div>
+                        <div class="card-meta">
+                           <span class="card-name">@(usersDict?.ContainsKey(moment.UserId) == true ? usersDict[moment.UserId].username : "Unknown")</span
+                            <span class="card-time time-remaining" data-expires="@moment.ExpiresAt.ToString("o")"></span>
+                        </div>
+                        <span class="live-badge"><i class="fas fa-circle"></i> LIVE</span>
+                    </div>
+                    <div class="card-visual">
+                        @if (moment.FileType == "video")
+                        {
+                            <video src="@moment.MediaUrl" muted loop playsinline preload="metadata" onclick="this.paused ? this.play() : this.pause()"></video>
+                        }
+                        else
+                        {
+                            <img src="@moment.MediaUrl" alt="Moment" />
+                        }
+                    </div>
+                    <div class="card-footer">
+                        @if (!string.IsNullOrEmpty(moment.Caption))
+                        {
+                            <div class="card-caption">@moment.Caption</div>
+                        }
+                        <div class="card-actions">
+                            <button class="act-btn" onclick="toggleLike(this)">
+                                <i class="far fa-heart"></i> <span>0</span>
+                            </button>
+                            <button class="act-btn" onclick="viewMoment(@moment.Id, this)">
+                                <i class="far fa-eye"></i> <span>@moment.Views.Count</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+    <!-- Upload Overlay -->
+    <div class="upload-overlay" id="uploadOverlay" onclick="closeUpload()">
+        <div class="upload-sheet" id="uploadSheet" onclick="event.stopPropagation()">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title">
+                <i class="fas fa-camera"></i> New Moment
+            </div>
+            <div class="drop-zone" id="dropZone"
+                 onclick="document.getElementById('fileInput').click()"
+                 ondragover="event.preventDefault();this.classList.add('drag-over')"
+                 ondragleave="this.classList.remove('drag-over')"
+                 ondrop="handleDrop(event)">
+                <div class="drop-icon" id="dropIcon">
+                    <i class="fas fa-camera-retro"></i>
+                </div>
+                <p class="drop-title" id="dropTitle">Drop your photo or video here</p>
+                <p class="drop-sub" id="dropSub">or tap to browse</p>
+                <input type="file" id="fileInput" accept="image/*,video/*" style="display:none" onchange="handleFile(event)" />
+                <img id="previewImg" class="preview-img" style="display:none" alt="preview" />
+                <video id="previewVideo" class="preview-img" style="display:none" muted autoplay loop playsinline></video>
+                <button class="clear-btn" id="clearBtn" style="display:none" onclick="clearFile(event)">
+                    <i class="fas fa-times"></i> Remove
+                </button>
+            </div>
+            <input type="text" id="captionInput" class="caption-input" placeholder="Write a caption..." maxlength="150" />
+            <div class="sheet-actions">
+                <button class="btn-cancel" onclick="closeUpload()">Cancel</button>
+                <button class="btn-upload" id="uploadBtn" onclick="uploadMoment()" disabled>
+                    <i class="fas fa-camera"></i> Share Moment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        min-height: 100%;
+    }
+    .chat-container {
+        max-width: 800px;
+        margin: 0 auto;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%);
+        backdrop-filter: blur(20px);
+        border-radius: 24px;
+        box-shadow: 0 25px 80px rgba(0,0,0,0.4), 0 0 1px rgba(255,255,255,0.1) inset;
+        border: 1px solid rgba(255,255,255,0.08);
+        overflow: hidden;
+        position: relative;
+    }
+    @@media (min-width: 768px) {
+        .chat-container { margin: 30px auto; height: calc(100vh - 60px); border-radius: 24px; }
+    }
+    .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 24px 30px;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+        color: white;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        box-shadow: 0 4px 30px rgba(99,102,241,0.4);
+        border-bottom: 1px solid rgba(255,255,255,0.15);
+        flex-shrink: 0;
+    }
+    .header-center { display: flex; align-items: center; gap: 14px; margin: 0 auto; }
+    .logo-icon {
+        width: 46px; height: 46px;
+        background: rgba(255,255,255,0.2);
+        border-radius: 14px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 22px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    .header-center h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; text-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+    .header-right { display: flex; align-items: center; }
+    .logout-btn {
+        width: 44px; height: 44px;
+        background: rgba(255,255,255,0.12);
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        color: white; text-decoration: none;
+        transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .logout-btn:hover { background: rgba(99,102,241,0.8); transform: translateY(-2px) scale(1.05); box-shadow: 0 8px 25px rgba(99,102,241,0.4); }
+    .tab-nav {
+        display: flex;
+        background: rgba(255,255,255,0.04);
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+        padding: 0 30px;
+        flex-shrink: 0;
+    }
+    .tab-item {
+        flex: 1; text-align: center; padding: 16px 20px;
+        color: rgba(255,255,255,0.5); text-decoration: none;
+        font-weight: 600; font-size: 14px;
+        border-bottom: 3px solid transparent;
+        transition: all 0.3s ease;
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        letter-spacing: 0.3px;
+    }
+    .tab-item:hover { color: rgba(255,255,255,0.8); background: rgba(99,102,241,0.08); }
+    .tab-item.active { color: #a855f7; border-bottom-color: #a855f7; }
+    .moments-body { flex: 1; overflow-y: auto; scrollbar-width: none; }
+    .moments-body::-webkit-scrollbar { display: none; }
+    .pulse-bar { padding: 14px 16px 10px; }
+    .pulse-label {
+        font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+        color: rgba(255,255,255,0.3); display: block; margin-bottom: 10px;
+    }
+    .pulse-track { display: flex; gap: 14px; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; }
+    .pulse-track::-webkit-scrollbar { display: none; }
+    .pulse-node { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; cursor: pointer; }
+    .pulse-ring { width: 64px; height: 64px; border-radius: 50%; padding: 3px; display: flex; align-items: center; justify-content: center; }
+    .live-ring { background: linear-gradient(135deg, #a855f7, #6366f1); }
+    .seen-ring { background: rgba(255,255,255,0.1); }
+    .add-ring { background: transparent; border: 2px dashed rgba(168,85,247,0.5); }
+    .pulse-inner {
+        width: 100%; height: 100%; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 16px; font-weight: 700; color: #fff;
+        border: 2px solid #1a1a2e;
+    }
+    .add-inner { background: rgba(99,102,241,0.2); border: none; color: #a855f7; font-size: 22px; }
+    .seen-inner { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.35); }
+    .pulse-name { font-size: 11px; color: rgba(255,255,255,0.45); font-weight: 500; max-width: 64px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .feed-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 4px 0; }
+    .moments-feed { padding: 8px 14px 20px; display: flex; flex-direction: column; gap: 12px; }
+    .moment-card {
+        border-radius: 18px; overflow: hidden;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.07);
+        transition: transform 0.2s ease;
+    }
+    .moment-card:hover { transform: translateY(-2px); }
+    .card-header { display: flex; align-items: center; gap: 10px; padding: 11px 14px 9px; }
+    .card-avatar {
+        width: 36px; height: 36px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .card-meta { flex: 1; display: flex; flex-direction: column; gap: 1px; }
+    .card-name { font-size: 13px; font-weight: 600; color: #fff; }
+    .card-time { font-size: 11px; color: rgba(255,255,255,0.35); }
+    .live-badge {
+        font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+        padding: 3px 9px; border-radius: 20px;
+        background: rgba(168,85,247,0.18); color: #c084fc;
+    }
+    .live-badge i { font-size: 7px; vertical-align: 1px; animation: blink 1.5s infinite; }
+    @@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .seen-badge {
+        font-size: 10px; font-weight: 600;
+        padding: 3px 9px; border-radius: 20px;
+        background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.3);
+    }
+    .card-visual {
+        width: 100%; aspect-ratio: 16/9;
+        display: flex; align-items: center; justify-content: center;
+        background: #000;
+    }
+    .card-visual img, .card-visual video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .card-footer { padding: 10px 14px 12px; }
+    .card-caption { font-size: 13px; color: rgba(255,255,255,0.7); line-height: 1.5; margin-bottom: 10px; }
+    .card-actions { display: flex; gap: 7px; }
+    .act-btn {
+        flex: 1; padding: 8px 0;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 10px;
+        color: rgba(255,255,255,0.5); font-size: 12px; font-weight: 600;
+        cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;
+        transition: all 0.2s;
+    }
+    .act-btn:hover { background: rgba(168,85,247,0.12); border-color: rgba(168,85,247,0.35); color: #c084fc; }
+    .act-btn.lit { background: rgba(168,85,247,0.2); border-color: rgba(168,85,247,0.45); color: #e879f9; }
+    .upload-overlay {
+        display: none;
+        position: absolute; inset: 0;
+        background: rgba(10,8,20,0.75);
+        z-index: 20;
+        align-items: flex-end;
+        backdrop-filter: blur(6px);
+    }
+    .upload-overlay.open { display: flex; }
+    .upload-sheet {
+        width: 100%;
+        background: #1c1a30;
+        border-radius: 24px 24px 0 0;
+        padding: 16px 20px 28px;
+        border-top: 1px solid rgba(255,255,255,0.1);
+        animation: slideUp 0.3s cubic-bezier(0.32,0.72,0,1);
+    }
+    @@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .sheet-handle {
+        width: 40px; height: 4px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 2px; margin: 0 auto 18px;
+    }
+    .sheet-title {
+        font-size: 16px; font-weight: 700; color: #fff;
+        margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+    }
+    .sheet-title i { color: #a855f7; }
+    .drop-zone {
+        width: 100%;
+        min-height: 180px;
+        border: 2px dashed rgba(99,102,241,0.4);
+        border-radius: 16px;
+        background: rgba(99,102,241,0.06);
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 6px; cursor: pointer;
+        transition: all 0.25s ease;
+        position: relative; overflow: hidden;
+        margin-bottom: 12px;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+        border-color: rgba(168,85,247,0.7);
+        background: rgba(168,85,247,0.1);
+    }
+    .drop-icon { font-size: 38px; color: rgba(168,85,247,0.5); margin-bottom: 4px; transition: transform 0.2s; }
+    .drop-zone:hover .drop-icon { transform: scale(1.1); color: rgba(168,85,247,0.8); }
+    .drop-title { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.7); }
+    .drop-sub { font-size: 12px; color: rgba(255,255,255,0.3); }
+    .preview-img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; border-radius: 14px; }
+    .clear-btn {
+        position: absolute; top: 10px; right: 10px;
+        background: rgba(0,0,0,0.6); color: #fff;
+        border: none; border-radius: 8px;
+        padding: 5px 10px; font-size: 11px; font-weight: 600;
+        cursor: pointer; z-index: 2; display: flex; align-items: center; gap: 4px;
+    }
+    .caption-input {
+        width: 100%; padding: 12px 14px;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 12px;
+        color: #fff; font-size: 13px;
+        outline: none; margin-bottom: 14px;
+        transition: border-color 0.2s;
+    }
+    .caption-input::placeholder { color: rgba(255,255,255,0.3); }
+    .caption-input:focus { border-color: rgba(168,85,247,0.5); }
+    .sheet-actions { display: flex; gap: 10px; }
+    .btn-cancel {
+        flex: 1; padding: 13px;
+        background: rgba(255,255,255,0.07);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 14px; color: rgba(255,255,255,0.6);
+        font-size: 14px; font-weight: 600; cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-cancel:hover { background: rgba(255,255,255,0.12); }
+    .btn-upload {
+        flex: 2; padding: 13px;
+        background: linear-gradient(135deg, #6366f1, #a855f7);
+        border: none; border-radius: 14px;
+        color: #fff; font-size: 14px; font-weight: 700;
+        cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+        transition: all 0.2s; opacity: 0.4;
+    }
+    .btn-upload:not([disabled]) { opacity: 1; }
+    .btn-upload:not([disabled]):hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(168,85,247,0.4); }
+    @@media (max-width: 600px) {
+        .chat-header { padding: 18px 20px; }
+        .tab-nav { padding: 0 20px; }
+    }
+</style>
+<script>
+    let selectedFile = null;
+    let selectedFileType = 'image';
+    function openUpload() {
+        document.getElementById('uploadOverlay').classList.add('open');
+    }
+    function closeUpload() {
+        document.getElementById('uploadOverlay').classList.remove('open');
+        clearFile(null);
+    }
+    function handleFile(e) {
+        const file = e.target.files[0];
+        if (file) showPreview(file);
+    }
+    function handleDrop(e) {
+        e.preventDefault();
+        document.getElementById('dropZone').classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file) showPreview(file);
+    }
+    function showPreview(file) {
+        selectedFile = file;
+        selectedFileType = file.type.startsWith('video/') ? 'video' : 'image';
+        const img = document.getElementById('previewImg');
+        const video = document.getElementById('previewVideo');
+        img.style.display = 'none';
+        video.style.display = 'none';
+        if (selectedFileType === 'video') {
+            video.src = URL.createObjectURL(file);
+            video.style.display = 'block';
+        } else {
+            const reader = new FileReader();
+            reader.onload = function (ev) {
+                img.src = ev.target.result;
+                img.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+        document.getElementById('dropIcon').style.display = 'none';
+        document.getElementById('dropTitle').style.display = 'none';
+        document.getElementById('dropSub').style.display = 'none';
+        document.getElementById('clearBtn').style.display = 'flex';
+        document.getElementById('uploadBtn').disabled = false;
+    }
+    function clearFile(e) {
+        if (e) e.stopPropagation();
+        selectedFile = null;
+        document.getElementById('previewImg').style.display = 'none';
+        document.getElementById('previewImg').src = '';
+        document.getElementById('previewVideo').style.display = 'none';
+        document.getElementById('previewVideo').src = '';
+        document.getElementById('dropIcon').style.display = 'block';
+        document.getElementById('dropTitle').style.display = 'block';
+        document.getElementById('dropSub').style.display = 'block';
+        document.getElementById('clearBtn').style.display = 'none';
+        document.getElementById('uploadBtn').disabled = true;
+        document.getElementById('fileInput').value = '';
+    }
+    function uploadMoment() {
+        if (!selectedFile) return;
+        const btn = document.getElementById('uploadBtn');
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sharing...';
+        btn.disabled = true;
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        formData.append('fileType', selectedFileType);
+        formData.append('caption', document.getElementById('captionInput').value || '');
+        fetch('/Chat/UploadMoment', {
+            method: 'POST',
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                btn.innerHTML = '<i class="fas fa-check"></i> Shared!';
+                setTimeout(function () {
+                    closeUpload();
+                    location.reload();
+                }, 800);
+            } else {
+                alert('Upload failed: ' + data.error);
+                btn.innerHTML = '<i class="fas fa-camera"></i> Share Moment';
+                btn.disabled = false;
+            }
+        })
+        .catch(function () {
+            alert('Upload failed. Please try again.');
+            btn.innerHTML = '<i class="fas fa-camera"></i> Share Moment';
+            btn.disabled = false;
+        });
+    }
+    function toggleLike(btn) {
+        btn.classList.toggle('lit');
+        const s = btn.querySelector('span');
+        const n = parseInt(s.textContent);
+        const liked = btn.classList.contains('lit');
+        s.textContent = liked ? n + 1 : n - 1;
+        btn.querySelector('i').className = liked ? 'fas fa-heart' : 'far fa-heart';
+    }
+    function viewMoment(momentId, btn) {
+        fetch('/Chat/MarkMomentViewed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'momentId=' + momentId
+        });
+        fetch('/Chat/GetMomentViews?momentId=' + momentId)
+            .then(r => r.json())
+            .then(views => {
+                const s = btn.querySelector('span');
+                s.textContent = views.length;
+            });
+    }
+    function updateTimeRemaining() {
+        document.querySelectorAll('.time-remaining').forEach(function (el) {
+            const expires = new Date(el.getAttribute('data-expires'));
+            const now = new Date();
+            const diff = expires - now;
+            if (diff <= 0) { el.textContent = 'Expired'; return; }
+            const h = Math.floor(diff / 3600000);
+            const m = Math.floor((diff % 3600000) / 60000);
+            el.textContent = h + 'h ' + m + 'm remaining';
+        });
+    }
+    updateTimeRemaining();
+    setInterval(updateTimeRemaining, 60000);
+</script>
