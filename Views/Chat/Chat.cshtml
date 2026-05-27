@@ -1133,22 +1133,24 @@
 
     /* Modern Video Card */
     /* Modern Video Card */
-    .video-card-modern { border-radius:18px; overflow:hidden; width:240px; min-width:240px; max-width:240px;
+    .video-card-modern { border-radius:18px; overflow:hidden; width:240px; min-width:0; max-width:100%;
     background:#000; box-shadow:0 4px 16px rgba(0,0,0,0.18); cursor:pointer;
     border-bottom-left-radius:6px; }
     .sent .video-card-modern { border-bottom-left-radius:18px; border-bottom-right-radius:6px; }
-    .vcm-thumb { position:relative; height:148px; background:linear-gradient(145deg,#1e293b,#334155);
-    display:flex; align-items:center; justify-content:center; }
+    .vcm-thumb { position:relative; aspect-ratio:16/9; background:linear-gradient(145deg,#1e293b,#334155);
+    display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .vcm-canvas { width:100% !important; height:100% !important; object-fit:cover; display:block; border-radius:0; }
     .vcm-film-icon { font-size:36px; color:rgba(255,255,255,0.12); }
     .vcm-play-overlay { position:absolute; inset:0; display:flex; align-items:center;
     justify-content:center; background:rgba(0,0,0,0.18); transition:background 0.2s; }
     .video-card-modern:hover .vcm-play-overlay { background:rgba(0,0,0,0.3); }
     .vcm-big-play { width:48px; height:48px; border-radius:50%; background:rgba(255,255,255,0.88);
-    display:flex; align-items:center; justify-content:center; transition:transform 0.15s; }
+    display:flex; align-items:center; justify-content:center; transition:transform 0.15s;
+    flex-shrink:0; position:relative; z-index:1; }
     .video-card-modern:hover .vcm-big-play { transform:scale(1.07); }
     .vcm-big-play i { color:#1e293b; font-size:18px; margin-left:2px; }
     .vcm-duration-badge { position:absolute; bottom:8px; right:8px; background:rgba(0,0,0,0.65);
-    color:#fff; font-size:11px; font-weight:600; padding:2px 7px; border-radius:6px; }
+    color:#fff; font-size:11px; font-weight:600; padding:2px 7px; border-radius:6px; z-index:2; }
     .vcm-footer { padding:8px 12px; background:rgba(15,23,42,0.85); display:flex;
     align-items:center; gap:8px; }
     .vcm-label { font-size:12px; color:rgba(255,255,255,0.85); font-weight:500; flex:1;
@@ -2297,11 +2299,11 @@ connection.start()
     messageContent = `
     <div class="video-card-modern" data-src="${message}" onclick="openVideoPlayer('${message}')">
       <div class="vcm-thumb" style="position:relative;">
-        <canvas class="vcm-canvas" id="${vcmId}-canvas" style="width:240px;height:148px;display:block;object-fit:cover;"></canvas>
+        <canvas class="vcm-canvas" id="${vcmId}-canvas" style="display:block;"></canvas>
         <i class="fas fa-film vcm-film-icon vcm-film-fallback" id="${vcmId}-fallback"></i>
         <div class="vcm-play-overlay">
           <div class="vcm-big-play"><i class="fas fa-play"></i></div>
-        </div>Plan
+        </div>
         <span class="vcm-duration-badge" id="${vcmId}-dur">${durStr}</span>
       </div>
       
@@ -2962,7 +2964,7 @@ connection.start()
     messageContent = `<div class="file-message"><div class="img-msg-wrap"><img src="${text}" alt="${fileName || 'Image'}" /><a href="javascript:void(0)" onclick="downloadFile('${escAttr(text)}', '${escAttr(fileName || 'image')}'); event.stopPropagation();" class="img-dl-btn" aria-label="Download"><i class="fas fa-download"></i></a></div></div>`;
     } else if (fileType === 'video') {
     const vcmId2 = 'vcm-upd-' + Math.random().toString(36).slice(2);
-    messageContent = `<div class="file-message"><div class="video-card-modern" data-src="${text}" onclick="openVideoPlayer('${text}')"><div class="vcm-thumb" style="position:relative;"><canvas class="vcm-canvas" id="${vcmId2}-canvas" style="width:240px;height:148px;display:block;"></canvas><i class="fas fa-film vcm-film-fallback" id="${vcmId2}-fallback"></i><div class="vcm-play-overlay"><div class="vcm-big-play"><i class="fas fa-play"></i></div></div><span class="vcm-duration-badge" id="${vcmId2}-dur">--:--</span></div><div class="vcm-footer"><a href="javascript:void(0)" onclick="downloadFile('${escAttr(text)}', '${escAttr(fileName || 'video')}'); event.stopPropagation();" class="vcm-dl" aria-label="Download"><i class="fas fa-download"></i></a></div></div></div>`;
+    messageContent = `<div class="file-message"><div class="video-card-modern" data-src="${text}" onclick="openVideoPlayer('${text}')"><div class="vcm-thumb" style="position:relative;"><canvas class="vcm-canvas" id="${vcmId2}-canvas" style="display:block;"></canvas><i class="fas fa-film vcm-film-fallback" id="${vcmId2}-fallback"></i><div class="vcm-play-overlay"><div class="vcm-big-play"><i class="fas fa-play"></i></div></div><span class="vcm-duration-badge" id="${vcmId2}-dur">--:--</span></div><div class="vcm-footer"><a href="javascript:void(0)" onclick="downloadFile('${escAttr(text)}', '${escAttr(fileName || 'video')}'); event.stopPropagation();" class="vcm-dl" aria-label="Download"><i class="fas fa-download"></i></a></div></div></div>`;
     setTimeout(() => initVideoCardByEl(document.getElementById('${vcmId2}-canvas')), 0);
     } else if (fileType === 'document') {
     const ext2 = (fileName || '').split('.').pop().toUpperCase() || 'FILE';

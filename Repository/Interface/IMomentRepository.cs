@@ -13,5 +13,7 @@ namespace Chat_App.Repositories
         Task<List<Moment>> GetExpiredMomentsAsync();
         void RemoveMoment(Moment moment);
         Task SaveChangesAsync();
+
+        Task<Moment> GetMomentByIdAsync(int momentId);
     }
 }

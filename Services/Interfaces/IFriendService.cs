@@ -13,5 +13,6 @@ namespace Chat_App.Services.Interfaces
         Task<UserSearchResultDto> GetAllUsersForFriendRequest(int currentUserId, int skip = 0, int take = 15);
         Task<List<FriendDto>> GetFriends(int currentUserId);
         Task UpdateRelationship(int currentUserId, int userId, string relationship);
+        Task CancelFriendRequest(int currentUserId, int requestId);
     }
 }

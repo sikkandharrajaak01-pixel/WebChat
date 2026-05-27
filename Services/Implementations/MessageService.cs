@@ -51,7 +51,8 @@ namespace Chat_App.Services.Implementations
                     IsDelivered = m.IsDelivered,
                     IsRead = m.IsRead,
                     IsStared = m.IsStared,
-                    IsDeleted = false
+                    IsDeleted = false,
+                    Duration=m.Duration
                 };
             }).Where(m => m != null).Cast<MessageDto>().ToList();
             return new MessageListResult { Messages = result, HasMore = hasMore };
@@ -90,7 +91,8 @@ namespace Chat_App.Services.Implementations
                     DeliveredCount = deliveredCount,
                     ReadCount = readCount,
                     TotalRecipients = totalRecipients,
-                    IsStared = m.IsStared ?? false
+                    IsStared = m.IsStared ?? false,
+                    Duration=m.Duration
                 });
             }
             return new GroupMessageListResult { Messages = result, HasMore = hasMore };

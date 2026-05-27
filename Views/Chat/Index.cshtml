@@ -377,6 +377,12 @@
                                 <span class="card-time time-remaining" data-expires="@moment.ExpiresAt.ToString("o")"></span>
                             </div>
                             <span class="live-badge"><i class="fas fa-circle"></i> LIVE</span>
+                            @if (moment.UserId == currentUserId)
+{
+    <button class="moment-delete-btn" onclick="deleteMoment(@moment.Id, this)" title="Delete moment">
+        <i class="fas fa-trash-alt"></i>
+    </button>
+}
                         </div>
                         <div class="card-visual">
                             @if (moment.FileType == "video")
@@ -1528,6 +1534,12 @@
         position: relative; overflow: hidden;
         margin-bottom: 12px;
     }
+    .moment-delete-btn {
+    margin-left: auto; background: none; border: none;
+    color: rgba(255,255,255,0.3); font-size: 14px; cursor: pointer;
+    padding: 4px 8px; border-radius: 8px; transition: all 0.2s;
+}
+.moment-delete-btn:hover { color: #ef4444; background: rgba(239,68,68,0.15); }
     .drop-zone:hover, .drop-zone.drag-over {
         border-color: rgba(168,85,247,0.7);
         background: rgba(168,85,247,0.1);
@@ -2001,6 +2013,7 @@ function closeGroupPopup() {
                 btn.innerHTML = '<i class="fas fa-check"></i> Shared!';
                 setTimeout(function () {
                     closeUpload();
+                    sessionStorage.setItem('activeTab', 'moments');
                     location.reload();
                 }, 800);
             } else {
@@ -2015,6 +2028,33 @@ function closeGroupPopup() {
             btn.disabled = false;
         });
     }
+ async function deleteMoment(momentId, btn) {
+const result = await Swal.fire({
+    title: 'Delete this moment?',
+    text: 'This will be permanently deleted.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#ef4444',
+    cancelButtonColor: '#64748b',
+    confirmButtonText: 'Yes, delete it!',
+    cancelButtonText: 'Cancel'
+});
+if (!result.isConfirmed) return;  
+fetch('/Chat/DeleteMoment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'momentId=' + momentId
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            btn.closest('.moment-card').remove();
+        } else {
+            alert('Failed to delete: ' + data.error);
+        }
+    })
+    .catch(() => alert('Something went wrong'));
+}
     function toggleLike(btn) {
         btn.classList.toggle('lit');
         const s = btn.querySelector('span');
@@ -2043,7 +2083,7 @@ function closeGroupPopup() {
     }
     function updateTimeRemaining() {
         document.querySelectorAll('.time-remaining').forEach(function (el) {
-            const expires = new Date(el.getAttribute('data-expires'));
+            const expires = new Date(el.getAttribute('data-expires') + 'Z');
             const now = new Date();
             const diff = expires - now;
             if (diff <= 0) { el.textContent = 'Expired'; return; }
@@ -2054,4 +2094,11 @@ function closeGroupPopup() {
     }
     updateTimeRemaining();
     setInterval(updateTimeRemaining, 60000);
+
+    // Restore active tab after page reload
+    var savedTab = sessionStorage.getItem('activeTab');
+    if (savedTab) {
+        sessionStorage.removeItem('activeTab');
+        showTab(savedTab);
+    }
 </script>

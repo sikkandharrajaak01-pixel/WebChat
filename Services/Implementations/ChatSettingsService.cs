@@ -25,13 +25,13 @@ namespace Chat_App.Services.Implementations
                     UserId = userId,
                     PeerId = peerId,
                     MessageTimeColor = color,
-                    UpdatedAt = DateTime.Now
+                    UpdatedAt = DateTime.UtcNow
                 });
             }
             else
             {
                 background.MessageTimeColor = color;
-                background.UpdatedAt = DateTime.Now;
+                background.UpdatedAt = DateTime.UtcNow;
                 await _bgRepo.SaveChangesAsync();
             }
         }
@@ -56,7 +56,7 @@ namespace Chat_App.Services.Implementations
                 existing.BackgroundImage = imageUrl;
                 existing.BackgroundType = "image";
                 existing.BackgroundFit = fit;
-                existing.UpdatedAt = DateTime.Now;
+                existing.UpdatedAt = DateTime.UtcNow;
             }
             else
             {
@@ -67,7 +67,7 @@ namespace Chat_App.Services.Implementations
                     BackgroundImage = imageUrl,
                     BackgroundType = "image",
                     BackgroundFit = fit,
-                    UpdatedAt = DateTime.Now
+                    UpdatedAt = DateTime.UtcNow
                 });
             }
             await _bgRepo.SaveChangesAsync();
@@ -101,7 +101,7 @@ namespace Chat_App.Services.Implementations
             if (bg != null)
             {
                 bg.BackgroundFit = fit;
-                bg.UpdatedAt = DateTime.Now;
+                bg.UpdatedAt = DateTime.UtcNow;
                 await _bgRepo.SaveChangesAsync();
             }
         }

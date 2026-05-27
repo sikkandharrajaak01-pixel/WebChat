@@ -3,6 +3,7 @@ using Chat_App.Repositories;
 using Chat_App.Services.Interfaces;
 using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
+using Microsoft.AspNetCore.Mvc;
 namespace Chat_App.Services.Implementations
 {
     public class MomentService : IMomentService
@@ -79,6 +80,22 @@ namespace Chat_App.Services.Implementations
                 ViewedByUserId = viewerId,
                 ViewedAt = DateTime.UtcNow
             });
+        }
+        public async Task<bool> DeleteMoment(int momentId, int userId)
+        {
+            var moment = await _momentRepo.GetMomentByIdAsync(momentId);
+            if (moment == null || moment.UserId != userId)
+                return false;
+            try
+            {
+                await _cloudinary.DestroyAsync(new DeletionParams(moment.CloudinaryPublicId));
+            }
+            catch
+            { }
+            _momentRepo.RemoveMoment(moment);
+            await _momentRepo.SaveChangesAsync();
+            return true;
+            
         }
         public async Task<int> GetViewCount(int momentId)
             => await _momentRepo.GetViewCountAsync(momentId);

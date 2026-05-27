@@ -1,4 +1,5 @@
 ﻿using Chat_App.Models;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 namespace Chat_App.Repositories
 {
@@ -46,5 +47,7 @@ namespace Chat_App.Repositories
             => await _context.moments.Where(m => m.ExpiresAt <= DateTime.UtcNow).ToListAsync();
         public void RemoveMoment(Moment moment) { _context.moments.Remove(moment); }
         public async Task SaveChangesAsync() { await _context.SaveChangesAsync(); }
+        public async Task<Moment?> GetMomentByIdAsync(int momentId)
+           => await _context.moments.FirstOrDefaultAsync(moment => moment.Id == momentId);
     }
 }

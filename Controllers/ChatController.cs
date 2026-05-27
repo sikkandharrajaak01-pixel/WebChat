@@ -4,6 +4,7 @@ using Chat_App.Services.Dtos;
 using Chat_App.Services.Implementations;
 using Chat_App.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 namespace Chat_App.Controllers
@@ -63,7 +64,7 @@ namespace Chat_App.Controllers
             ViewBag.CurrentUserId = userId;
             ViewBag.CurrentUsername = currentUsername;
             ViewBag.Users = userlist;
-            return View(moments);
+            return RedirectToAction("Index");
         }
         [HttpPost]
         public async Task<IActionResult> UploadMoment()
@@ -435,6 +436,12 @@ namespace Chat_App.Controllers
             await _friend.RejectFriendRequest(CurrentUserId, requestId);
             return Ok(new { success = true });
         }
+        [HttpPost]
+        public async Task<IActionResult> CancelFriendRequest(int requestId)
+        {
+            await _friend.CancelFriendRequest(CurrentUserId, requestId);
+            return Ok(new { success = true });
+        }
         [HttpGet]
         public async Task<IActionResult> GetPendingFriendRequests()
         {
@@ -482,6 +489,12 @@ namespace Chat_App.Controllers
         {
             await _push.SendTestNotification(CurrentUserId);
             return Content("Push sent. Check console/server logs for errors.");
+        }
+        [HttpPost]
+        public async Task<IActionResult> DeleteMoment(int momentId)
+        {
+            var ok = await momentService.DeleteMoment(momentId, CurrentUserId);
+            return ok ? Json(new { success = true }) : BadRequest(new { success = false, error = "Not found or unauthorized" });
         }
     }
 }

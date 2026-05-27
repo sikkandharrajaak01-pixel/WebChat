@@ -13,5 +13,7 @@ namespace Chat_App.Repositories
         Task AddAsync(FriendRequest request);
         Task SaveChangesAsync();
         IQueryable<FriendRequest> Query();
+        Task<FriendRequest?> GetByIdAndSenderAsync(int requestId, int senderId);
+        Task DeleteAsync(FriendRequest request);
     }
 }

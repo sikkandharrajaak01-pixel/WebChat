@@ -639,7 +639,7 @@
                 statusText = user.isOnline ? 'Online' : 'Offline';
             } else if (status.status === "Pending") {
                 if (status.isSender) {
-                    btnHtml = `<button class="add-friend-btn pending"><i class="fas fa-clock"></i> Request Sent</button>`;
+                    btnHtml = `<button class="add-friend-btn reject" onclick="cancelFriendRequestFromList(${user.id})"><i class="fas fa-times"></i> Cancel Request</button>`;
                     statusText = 'Awaiting response';
                 } else {
                     btnHtml = `<button class="add-friend-btn accept" onclick="acceptFriendRequestFromList(${user.id})"><i class="fas fa-check"></i> Accept</button>
@@ -730,7 +730,7 @@
                                 <div class="add-friend-name">${req.receiverName}</div>
                                 <div class="add-friend-status">Pending...</div>
                             </div>
-                            <button class="add-friend-btn pending"><i class="fas fa-clock"></i> Pending</button>
+                           <button class="add-friend-btn reject" onclick="cancelFriendRequestById(${req.id})"><i class="fas fa-times"></i> Cancel</button>
                         </div>
                     `;
                 }).join('');
@@ -814,6 +814,14 @@
             await rejectFriendRequestById(status.requestId);
         }
     }
+    async function cancelFriendRequestById(requestId) {
+    const response = await fetch(`/Chat/CancelFriendRequest?requestId=${requestId}`, { method: 'POST' });
+    if (response.ok) { await loadSentRequests(); await loadUsersForFriends(true); }
+}
+async function cancelFriendRequestFromList(userId) {
+    const status = getFriendStatus(userId);
+    if (status && status.requestId) { await cancelFriendRequestById(status.requestId); }
+}
 
     // SignalR connection for real-time friend request updates
     const friendsConnection = new signalR.HubConnectionBuilder()

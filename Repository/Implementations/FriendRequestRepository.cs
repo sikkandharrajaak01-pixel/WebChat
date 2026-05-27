@@ -39,5 +39,13 @@ namespace Chat_App.Repositories
                 (f.SenderId == userId2 && f.ReceiverId == userId1));
         public async Task AddAsync(FriendRequest request) { _context.friendRequests.Add(request); await _context.SaveChangesAsync(); }
         public async Task SaveChangesAsync() { await _context.SaveChangesAsync(); }
+
+        public async Task<FriendRequest?> GetByIdAndSenderAsync(int requestId, int senderId)
+            => await _context.friendRequests.FirstOrDefaultAsync(request => request.SenderId == senderId && request.Id == requestId && request.Status == "Pending");
+        public async Task DeleteAsync(FriendRequest request)
+        {
+            _context.friendRequests.Remove(request);
+            await _context.SaveChangesAsync();
+        }
     }
 }

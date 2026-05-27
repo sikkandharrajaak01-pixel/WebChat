@@ -3,6 +3,7 @@ using Chat_App.Repositories;
 using Chat_App.Services.Dtos;
 using Chat_App.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Org.BouncyCastle.Crypto.Prng;
 namespace Chat_App.Services.Implementations
 {
     public class FriendService : IFriendService
@@ -31,7 +32,7 @@ namespace Chat_App.Services.Implementations
                 SenderId = currentUserId,
                 ReceiverId = receiverId,
                 Status = "Pending",
-                SentAt = DateTime.Now,
+                SentAt = DateTime.UtcNow,
                 Bond = "Unknown"
             };
             await _friendRequestRepo.AddAsync(request);
@@ -43,7 +44,7 @@ namespace Chat_App.Services.Implementations
             var request = await _friendRequestRepo.GetByIdAndReceiverAsync(requestId, currentUserId);
             if (request == null) return;
             request.Status = "Accepted";
-            request.RespondedAt = DateTime.Now;
+            request.RespondedAt = DateTime.UtcNow;
             await _friendRequestRepo.SaveChangesAsync();
             await _notification.NotifyFriendRequestAccepted(request.SenderId, currentUserId);
         }
@@ -52,7 +53,7 @@ namespace Chat_App.Services.Implementations
             var request = await _friendRequestRepo.GetByIdAndReceiverAsync(requestId, currentUserId);
             if (request == null) return;
             request.Status = "Rejected";
-            request.RespondedAt = DateTime.Now;
+            request.RespondedAt = DateTime.UtcNow;
             await _friendRequestRepo.SaveChangesAsync();
         }
         public async Task<List<PendingFriendRequestDto>> GetPendingRequests(int currentUserId)
@@ -157,6 +158,12 @@ namespace Chat_App.Services.Implementations
                 friend.Bond = relationship;
                 await _friendRequestRepo.SaveChangesAsync();
             }
+        }
+        public async Task CancelFriendRequest(int currentUserId, int requestId)
+        {
+            var request = await _friendRequestRepo.GetByIdAndSenderAsync(requestId, currentUserId);
+            if (request == null) return;
+            await _friendRequestRepo.DeleteAsync(request);
         }
     }
 }
