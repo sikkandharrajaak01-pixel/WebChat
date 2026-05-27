@@ -30,7 +30,7 @@
                     {
                         var dt = (DateTime)ViewBag.LastSeen;
                         var t = dt.ToString("h:mm tt").Replace(".", ":");
-                        var d = (DateTime.Now.Date - dt.Date).Days;
+                        var d = (DateTime.UtcNow.Date - dt.Date).Days;
                         if (d == 0)
                         {
                             <span>last seen @t</span>

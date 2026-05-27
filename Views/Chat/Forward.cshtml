@@ -1,0 +1,658 @@
+@using Chat_App.Services.Dtos
+@using Chat_App.Models
+@{
+    var friends = ViewBag.Friends as List<FriendDto> ?? new List<FriendDto>();
+    var groups = ViewBag.Groups as List<GroupCredentials> ?? new List<GroupCredentials>();
+}
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
+
+<div class="fw-wrapper">
+
+    <!-- Ambient background blobs -->
+    <div class="fw-bg">
+        <div class="fw-blob fw-blob-1"></div>
+        <div class="fw-blob fw-blob-2"></div>
+        <div class="fw-blob fw-blob-3"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="fw-header">
+        <a href="javascript:history.back()" class="fw-back">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+        <div class="fw-header-text">
+            <h1>Forward Message</h1>
+            <p>Choose recipients below</p>
+        </div>
+        <div class="fw-header-badge" id="headerBadge" style="opacity:0;">
+            <span id="headerBadgeCount">0</span>
+        </div>
+    </header>
+
+    <!-- Message Preview -->
+    <div class="fw-preview">
+        <div class="fw-preview-tag">
+            <i class="fas fa-share"></i>
+            <span>Forwarding</span>
+        </div>
+        <div class="fw-preview-body" id="forwardPreviewContent"></div>
+    </div>
+
+    <!-- Search bar -->
+    <div class="fw-search-wrap">
+        <i class="fas fa-search fw-search-icon"></i>
+        <input type="text" class="fw-search" id="searchInput" placeholder="Search friends & groups…" oninput="filterList(this.value)" />
+    </div>
+
+    <!-- Recipients -->
+    <div class="fw-scroll">
+
+        @if (friends.Any())
+        {
+            <div class="fw-section-label">
+                <span class="fw-label-dot"></span>
+                Friends
+            </div>
+            <div class="fw-list" id="friendsList">
+                @foreach (var friend in friends)
+                {
+                    <label class="fw-item" data-type="user" data-id="@friend.Id" data-name="@friend.Username.ToLower()">
+                        <div class="fw-avatar @(string.IsNullOrEmpty(friend.ProfileImagePath) ? "fw-avatar-initials" : "")">
+                            @if (!string.IsNullOrEmpty(friend.ProfileImagePath))
+                            {
+                                <img src="@friend.ProfileImagePath" alt="@friend.Username" />
+                            }
+                            else
+                            {
+                                <span>@friend.Username.Substring(0, 1).ToUpper()</span>
+                            }
+                            @if (friend.IsOnline)
+                            {
+                                <span class="fw-online"></span>
+                            }
+                        </div>
+                        <div class="fw-info">
+                            <div class="fw-name">@friend.Username</div>
+                            <div class="fw-sub @(friend.IsOnline ? "fw-sub--online" : "")">
+                                @if (friend.IsOnline)
+                                {
+                                    <span class="fw-pulse"></span>
+                                }
+                                @(friend.IsOnline ? "Active now" : "Offline")
+                            </div>
+                        </div>
+                        <div class="fw-check-wrap">
+                            <input type="checkbox" class="recipient-checkbox" data-type="user" data-id="@friend.Id" />
+                            <span class="fw-checkmark"><i class="fas fa-check"></i></span>
+                        </div>
+                    </label>
+                }
+            </div>
+        }
+
+        @if (groups.Any())
+        {
+            <div class="fw-section-label">
+                <span class="fw-label-dot fw-label-dot--group"></span>
+                Groups
+            </div>
+            <div class="fw-list" id="groupsList">
+                @foreach (var group in groups)
+                {
+                    <label class="fw-item" data-type="group" data-id="@group.GroupId" data-name="@group.GroupName.ToLower()">
+                        <div class="fw-avatar fw-avatar--group @(string.IsNullOrEmpty(group.ProfileImagePath) ? "fw-avatar-initials" : "")">
+                            @if (!string.IsNullOrEmpty(group.ProfileImagePath))
+                            {
+                                <img src="@group.ProfileImagePath" alt="@group.GroupName" />
+                            }
+                            else
+                            {
+                                <i class="fas fa-users"></i>
+                            }
+                        </div>
+                        <div class="fw-info">
+                            <div class="fw-name">@group.GroupName</div>
+                            <div class="fw-sub">@group.UserIds.Count members</div>
+                        </div>
+                        <div class="fw-check-wrap">
+                            <input type="checkbox" class="recipient-checkbox" data-type="group" data-id="@group.GroupId" />
+                            <span class="fw-checkmark"><i class="fas fa-check"></i></span>
+                        </div>
+                    </label>
+                }
+            </div>
+        }
+
+        @if (!friends.Any() && !groups.Any())
+        {
+            <div class="fw-empty">
+                <div class="fw-empty-icon"><i class="fas fa-satellite-dish"></i></div>
+                <p>No one to forward to yet</p>
+                <span>Add friends to get started</span>
+            </div>
+        }
+
+        <div class="fw-empty fw-no-results" id="noResults" style="display:none;">
+            <div class="fw-empty-icon"><i class="fas fa-search"></i></div>
+            <p>No results found</p>
+        </div>
+    </div>
+
+    <!-- Bottom bar -->
+    <div class="fw-bottom">
+        <div class="fw-bottom-left">
+            <div class="fw-bottom-count">
+                <span id="bottomSelectedCount">0</span>
+            </div>
+            <span class="fw-bottom-label">selected</span>
+        </div>
+        <button class="fw-send" id="forwardSendBtn" onclick="sendForward()" disabled>
+            <span class="fw-send-text">Send Now</span>
+            <span class="fw-send-icon"><i class="fas fa-paper-plane"></i></span>
+        </button>
+    </div>
+</div>
+
+<style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+        height: 100%; overflow: hidden;
+        font-family: 'DM Sans', sans-serif;
+        background: #080c14;
+    }
+
+    /* ── CSS Variables ─────────────────────────────── */
+    :root {
+        --c-bg: #080c14;
+        --c-surface: rgba(255,255,255,0.04);
+        --c-surface-hover: rgba(255,255,255,0.07);
+        --c-border: rgba(255,255,255,0.07);
+        --c-accent: #00d4aa;
+        --c-accent-2: #0099ff;
+        --c-accent-glow: rgba(0, 212, 170, 0.25);
+        --c-group: #ff6b9d;
+        --c-group-glow: rgba(255, 107, 157, 0.2);
+        --c-text: #f0f4f8;
+        --c-text-muted: #5a6a7e;
+        --c-text-sub: #8896a6;
+        --c-online: #00e5a0;
+        --radius-card: 18px;
+        --radius-btn: 14px;
+        --shadow-card: 0 2px 16px rgba(0,0,0,0.3);
+    }
+
+    /* ── Background Blobs ──────────────────────────── */
+    .fw-bg {
+        position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+    }
+    .fw-blob {
+        position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.15;
+        animation: blobDrift 12s ease-in-out infinite alternate;
+    }
+    .fw-blob-1 {
+        width: 400px; height: 400px; top: -120px; left: -100px;
+        background: radial-gradient(circle, #00d4aa, #0099ff);
+        animation-duration: 14s;
+    }
+    .fw-blob-2 {
+        width: 350px; height: 350px; bottom: -100px; right: -80px;
+        background: radial-gradient(circle, #ff6b9d, #a855f7);
+        animation-duration: 18s; animation-delay: -6s;
+    }
+    .fw-blob-3 {
+        width: 250px; height: 250px; top: 50%; left: 60%;
+        background: radial-gradient(circle, #0099ff, transparent);
+        animation-duration: 10s; animation-delay: -3s;
+    }
+    @@keyframes blobDrift {
+        0%   { transform: translate(0, 0) scale(1); }
+        100% { transform: translate(30px, 20px) scale(1.08); }
+    }
+
+    /* ── Wrapper ───────────────────────────────────── */
+    .fw-wrapper {
+        position: fixed; inset: 0;
+        width: 100%; max-width: 900px; margin: 0 auto;
+        height: 100vh; height: 100dvh;
+        background: rgba(8, 12, 20, 0.92);
+        backdrop-filter: blur(20px);
+        display: flex; flex-direction: column;
+        z-index: 10;
+        border-left: 1px solid var(--c-border);
+        border-right: 1px solid var(--c-border);
+    }
+    @@media (min-width: 540px) {
+        .fw-wrapper {
+            top: 20px; bottom: 20px; height: auto;
+            border-radius: 28px;
+            box-shadow: 0 40px 100px rgba(0,0,0,0.6), 0 0 0 1px var(--c-border);
+        }
+    }
+
+    /* ── Header ────────────────────────────────────── */
+    .fw-header {
+        display: flex; align-items: center; gap: 14px;
+        padding: 20px 20px 16px;
+        flex-shrink: 0;
+        border-bottom: 1px solid var(--c-border);
+        animation: slideDown 0.4s cubic-bezier(0.16,1,0.3,1);
+    }
+    @@keyframes slideDown { from { opacity:0; transform: translateY(-12px); } to { opacity:1; transform: translateY(0); } }
+
+    .fw-back {
+        width: 42px; height: 42px; flex-shrink: 0;
+        background: var(--c-surface);
+        border: 1px solid var(--c-border);
+        border-radius: 14px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--c-text); text-decoration: none; font-size: 15px;
+        transition: all 0.2s;
+    }
+    .fw-back:hover { background: var(--c-surface-hover); border-color: var(--c-accent); color: var(--c-accent); transform: translateX(-2px); }
+
+    .fw-header-text { flex: 1; }
+    .fw-header-text h1 { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; color: var(--c-text); letter-spacing: -0.3px; }
+    .fw-header-text p  { font-size: 12px; color: var(--c-text-muted); margin-top: 2px; }
+
+    .fw-header-badge {
+        min-width: 32px; height: 32px; padding: 0 10px;
+        background: linear-gradient(135deg, var(--c-accent), var(--c-accent-2));
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 13px; font-weight: 700; color: #080c14;
+        transition: opacity 0.3s, transform 0.3s;
+        transform: scale(0.8);
+    }
+    .fw-header-badge.visible { opacity: 1 !important; transform: scale(1); }
+
+    /* ── Preview ───────────────────────────────────── */
+    .fw-preview {
+        margin: 16px 16px 0;
+        padding: 14px 16px;
+        background: var(--c-surface);
+        border: 1px solid var(--c-border);
+        border-radius: var(--radius-card);
+        flex-shrink: 0;
+        position: relative; overflow: hidden;
+        animation: fadeUp 0.4s 0.1s cubic-bezier(0.16,1,0.3,1) both;
+    }
+    .fw-preview::before {
+        content: '';
+        position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+        background: linear-gradient(180deg, var(--c-accent), var(--c-accent-2));
+        border-radius: 3px 0 0 3px;
+    }
+    .fw-preview-tag {
+        display: flex; align-items: center; gap: 6px;
+        font-size: 11px; font-weight: 600; color: var(--c-accent);
+        text-transform: uppercase; letter-spacing: 0.8px;
+        margin-bottom: 8px; margin-left: 2px;
+    }
+    .fw-preview-body {
+        font-size: 14px; color: var(--c-text-sub);
+        max-height: 56px; overflow: hidden;
+        line-height: 1.5; margin-left: 2px;
+    }
+
+    /* ── Search ────────────────────────────────────── */
+    .fw-search-wrap {
+        position: relative; margin: 14px 16px 8px; flex-shrink: 0;
+        animation: fadeUp 0.4s 0.2s cubic-bezier(0.16,1,0.3,1) both;
+    }
+    .fw-search-icon {
+        position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+        font-size: 13px; color: var(--c-text-muted); pointer-events: none;
+    }
+    .fw-search {
+        width: 100%; padding: 12px 14px 12px 40px;
+        background: var(--c-surface);
+        border: 1px solid var(--c-border);
+        border-radius: 12px;
+        color: var(--c-text); font-size: 14px; font-family: 'DM Sans', sans-serif;
+        outline: none; transition: all 0.2s;
+    }
+    .fw-search::placeholder { color: var(--c-text-muted); }
+    .fw-search:focus {
+        border-color: var(--c-accent);
+        box-shadow: 0 0 0 3px var(--c-accent-glow);
+        background: rgba(255,255,255,0.06);
+    }
+
+    /* ── Scrollable list ───────────────────────────── */
+    .fw-scroll {
+        flex: 1; overflow-y: auto;
+        padding: 4px 16px 12px;
+    }
+    .fw-scroll::-webkit-scrollbar { width: 4px; }
+    .fw-scroll::-webkit-scrollbar-track { background: transparent; }
+    .fw-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+    .fw-section-label {
+        display: flex; align-items: center; gap: 8px;
+        font-size: 11px; font-weight: 600; color: var(--c-text-muted);
+        text-transform: uppercase; letter-spacing: 1px;
+        padding: 14px 2px 8px;
+    }
+    .fw-label-dot {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: var(--c-accent);
+        box-shadow: 0 0 6px var(--c-accent);
+    }
+    .fw-label-dot--group {
+        background: var(--c-group);
+        box-shadow: 0 0 6px var(--c-group);
+    }
+
+    .fw-list { display: flex; flex-direction: column; gap: 4px; }
+
+    /* ── Item ──────────────────────────────────────── */
+    .fw-item {
+        display: flex; align-items: center; gap: 14px;
+        padding: 12px 14px;
+        border-radius: var(--radius-card);
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: background 0.15s, border-color 0.15s, transform 0.15s;
+        animation: fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both;
+        position: relative; overflow: hidden;
+    }
+    .fw-item:hover {
+        background: var(--c-surface-hover);
+        border-color: var(--c-border);
+        transform: translateX(2px);
+    }
+    .fw-item.is-selected {
+        background: rgba(0, 212, 170, 0.06);
+        border-color: rgba(0, 212, 170, 0.25);
+    }
+    .fw-item.is-selected::after {
+        content: '';
+        position: absolute; inset: 0; border-radius: var(--radius-card);
+        background: linear-gradient(90deg, rgba(0,212,170,0.04), transparent);
+        pointer-events: none;
+    }
+
+    /* stagger children */
+    .fw-list .fw-item:nth-child(1) { animation-delay: 0.05s; }
+    .fw-list .fw-item:nth-child(2) { animation-delay: 0.10s; }
+    .fw-list .fw-item:nth-child(3) { animation-delay: 0.15s; }
+    .fw-list .fw-item:nth-child(4) { animation-delay: 0.20s; }
+    .fw-list .fw-item:nth-child(5) { animation-delay: 0.25s; }
+
+    @@keyframes fadeUp {
+        from { opacity:0; transform: translateY(10px); }
+        to   { opacity:1; transform: translateY(0); }
+    }
+
+    /* ── Avatar ────────────────────────────────────── */
+    .fw-avatar {
+        width: 46px; height: 46px; border-radius: 15px;
+        flex-shrink: 0; position: relative; overflow: visible;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .fw-avatar img {
+        width: 46px; height: 46px; object-fit: cover;
+        border-radius: 15px;
+    }
+    .fw-avatar-initials {
+        background: linear-gradient(135deg, #1a2a3a, #0d1f2d);
+        border: 1px solid rgba(0, 212, 170, 0.2);
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 18px; font-weight: 700;
+        color: var(--c-accent);
+    }
+    .fw-avatar--group.fw-avatar-initials {
+        background: linear-gradient(135deg, #2a1a2a, #1f0d1f);
+        border-color: rgba(255, 107, 157, 0.25);
+        color: var(--c-group); font-size: 16px;
+    }
+    .fw-online {
+        position: absolute; bottom: -1px; right: -1px;
+        width: 13px; height: 13px; border-radius: 50%;
+        background: var(--c-online);
+        border: 2px solid #080c14;
+        box-shadow: 0 0 6px var(--c-online);
+    }
+
+    /* ── Info ──────────────────────────────────────── */
+    .fw-info { flex: 1; min-width: 0; }
+    .fw-name {
+        font-size: 15px; font-weight: 600; color: var(--c-text);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        letter-spacing: -0.1px;
+    }
+    .fw-sub {
+        display: flex; align-items: center; gap: 5px;
+        font-size: 12px; color: var(--c-text-muted); margin-top: 3px;
+    }
+    .fw-sub--online { color: var(--c-online); }
+    .fw-pulse {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: var(--c-online);
+        animation: pulse 2s ease-in-out infinite;
+    }
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50%       { opacity: 0.5; transform: scale(0.7); }
+    }
+
+    /* ── Checkbox ──────────────────────────────────── */
+    .fw-check-wrap {
+        position: relative; width: 26px; height: 26px; flex-shrink: 0;
+    }
+    .fw-check-wrap input[type="checkbox"] {
+        position: absolute; opacity: 0; inset: 0; cursor: pointer; z-index: 1;
+    }
+    .fw-checkmark {
+        position: absolute; inset: 0;
+        border-radius: 8px;
+        border: 1.5px solid rgba(255,255,255,0.12);
+        background: var(--c-surface);
+        transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1);
+        display: flex; align-items: center; justify-content: center;
+    }
+    .fw-checkmark i {
+        font-size: 11px; color: #080c14; opacity: 0;
+        transform: scale(0); transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .fw-check-wrap input:checked ~ .fw-checkmark {
+        background: linear-gradient(135deg, var(--c-accent), var(--c-accent-2));
+        border-color: transparent;
+        box-shadow: 0 0 12px var(--c-accent-glow);
+    }
+    .fw-check-wrap input:checked ~ .fw-checkmark i {
+        opacity: 1; transform: scale(1);
+    }
+
+    /* ── Empty / No results ────────────────────────── */
+    .fw-empty {
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        padding: 48px 20px; gap: 12px; color: var(--c-text-muted);
+        text-align: center;
+    }
+    .fw-empty-icon {
+        width: 64px; height: 64px; border-radius: 20px;
+        background: var(--c-surface);
+        border: 1px solid var(--c-border);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 24px; color: var(--c-text-muted);
+        margin-bottom: 4px;
+    }
+    .fw-empty p { font-size: 16px; font-weight: 600; color: var(--c-text-sub); }
+    .fw-empty span { font-size: 13px; color: var(--c-text-muted); }
+
+    /* ── Bottom bar ────────────────────────────────── */
+    .fw-bottom {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+        border-top: 1px solid var(--c-border);
+        background: rgba(8,12,20,0.8);
+        backdrop-filter: blur(12px);
+        flex-shrink: 0;
+        gap: 12px;
+    }
+
+    .fw-bottom-left {
+        display: flex; align-items: baseline; gap: 6px;
+    }
+    .fw-bottom-count {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 28px; font-weight: 700; color: var(--c-text);
+        line-height: 1;
+        transition: color 0.3s;
+    }
+    .fw-bottom-count.has-selection { color: var(--c-accent); }
+    .fw-bottom-label { font-size: 13px; color: var(--c-text-muted); }
+
+    .fw-send {
+        display: flex; align-items: center; gap: 0;
+        padding: 0; border: none; cursor: pointer;
+        border-radius: 16px; overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+        box-shadow: 0 4px 20px var(--c-accent-glow);
+        outline: none;
+    }
+    .fw-send:disabled {
+        opacity: 0.3; cursor: not-allowed;
+        box-shadow: none; transform: none !important;
+    }
+    .fw-send-text {
+        padding: 13px 18px 13px 20px;
+        background: linear-gradient(135deg, var(--c-accent), var(--c-accent-2));
+        color: #080c14; font-size: 14px; font-weight: 700;
+        font-family: 'Space Grotesk', sans-serif;
+        letter-spacing: -0.2px;
+    }
+    .fw-send-icon {
+        padding: 13px 16px;
+        background: rgba(0,0,0,0.2);
+        color: #080c14; font-size: 14px;
+        display: flex; align-items: center;
+    }
+    .fw-send:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 30px var(--c-accent-glow); }
+    .fw-send:active:not(:disabled) { transform: translateY(0); }
+
+    /* loading state */
+    .fw-send.sending .fw-send-text { opacity: 0.7; }
+</style>
+
+<script>
+    const forwardMsg = JSON.parse(sessionStorage.getItem('forwardMsg') || 'null');
+    if (!forwardMsg) window.location.href = '/Chat/Index';
+
+    /* ── Render preview ── */
+    const previewContent = document.getElementById('forwardPreviewContent');
+    if (forwardMsg) {
+        if (forwardMsg.fileType === 'image') {
+            previewContent.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><img src="${forwardMsg.text}" style="height:36px;width:52px;border-radius:8px;object-fit:cover;border:1px solid rgba(255,255,255,0.1);" /><span>📷 Photo</span></div>`;
+        } else if (forwardMsg.fileType === 'video') {
+            previewContent.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><i class="fas fa-video" style="color:var(--c-accent);font-size:18px;"></i><span>🎬 Video</span></div>`;
+        } else if (forwardMsg.fileType === 'audio') {
+            previewContent.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><i class="fas fa-microphone" style="color:var(--c-accent);font-size:18px;"></i><span>🎤 Voice message</span></div>`;
+        } else if (forwardMsg.fileType === 'document') {
+            previewContent.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><i class="fas fa-file-alt" style="color:var(--c-accent);font-size:18px;"></i><span>📄 ${forwardMsg.fileName || 'Document'}</span></div>`;
+        } else {
+            const txt = forwardMsg.text || '';
+            previewContent.textContent = txt.length > 120 ? txt.substring(0, 120) + '…' : txt;
+        }
+    }
+
+    /* ── Selection logic ── */
+    function updateSelection() {
+        const checked = document.querySelectorAll('.recipient-checkbox:checked');
+        const count = checked.length;
+
+        document.getElementById('bottomSelectedCount').textContent = count;
+        document.getElementById('headerBadgeCount').textContent = count;
+        document.getElementById('forwardSendBtn').disabled = count === 0;
+
+        const countEl = document.querySelector('.fw-bottom-count');
+        countEl.classList.toggle('has-selection', count > 0);
+
+        const badge = document.getElementById('headerBadge');
+        badge.classList.toggle('visible', count > 0);
+
+        /* highlight selected items */
+        document.querySelectorAll('.fw-item').forEach(item => {
+            const cb = item.querySelector('.recipient-checkbox');
+            item.classList.toggle('is-selected', cb && cb.checked);
+        });
+    }
+
+    document.querySelectorAll('.fw-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+            if (e.target.tagName === 'INPUT' && e.target.type === 'checkbox') return;
+            const cb = this.querySelector('.recipient-checkbox');
+            if (cb) { cb.checked = !cb.checked; updateSelection(); }
+        });
+    });
+    document.querySelectorAll('.recipient-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateSelection);
+    });
+
+    /* ── Search/filter ── */
+    function filterList(query) {
+        const q = query.trim().toLowerCase();
+        let visibleCount = 0;
+
+        document.querySelectorAll('.fw-item').forEach(item => {
+            const name = item.dataset.name || '';
+            const show = !q || name.includes(q);
+            item.style.display = show ? '' : 'none';
+            if (show) visibleCount++;
+        });
+
+        document.getElementById('noResults').style.display = (visibleCount === 0 && q) ? 'flex' : 'none';
+    }
+
+    /* ── Send ── */
+    async function sendForward() {
+        const btn = document.getElementById('forwardSendBtn');
+        btn.disabled = true;
+        btn.classList.add('sending');
+        btn.querySelector('.fw-send-text').textContent = 'Sending…';
+        btn.querySelector('.fw-send-icon').innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+        const userIds = [], groupIds = [];
+        document.querySelectorAll('.recipient-checkbox:checked').forEach(cb => {
+            if (cb.dataset.type === 'user') userIds.push(parseInt(cb.dataset.id));
+            else if (cb.dataset.type === 'group') groupIds.push(parseInt(cb.dataset.id));
+        });
+
+        try {
+            const response = await fetch('/Chat/SendForward', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userIds, groupIds,
+                    text: forwardMsg.text || '',
+                    fileType: forwardMsg.fileType || null,
+                    fileName: forwardMsg.fileName || null,
+                    duration: forwardMsg.duration || null
+                })
+            });
+
+            if (response.ok) {
+                sessionStorage.removeItem('forwardMsg');
+                window.location.href = '/Chat/Index';
+            } else {
+                alert('Failed to forward message. Please try again.');
+                btn.disabled = false;
+                btn.classList.remove('sending');
+                btn.querySelector('.fw-send-text').textContent = 'Send Now';
+                btn.querySelector('.fw-send-icon').innerHTML = '<i class="fas fa-paper-plane"></i>';
+            }
+        } catch (err) {
+            console.error('Forward failed:', err);
+            alert('Failed to forward message. Please try again.');
+            btn.disabled = false;
+            btn.classList.remove('sending');
+            btn.querySelector('.fw-send-text').textContent = 'Send Now';
+            btn.querySelector('.fw-send-icon').innerHTML = '<i class="fas fa-paper-plane"></i>';
+        }
+    }
+</script>

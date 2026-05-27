@@ -169,9 +169,9 @@ namespace Chat_App.Services.Implementations
             var allUsers = await _userRepo.Query()
                 .Where(u => u.Id != currentUserId && friendIds.Contains(u.Id) && !hiddenUserIds.Contains(u.Id))
                 .ToListAsync();
-            var allGroups = await _groupRepo.Query()
+            var allGroups = (await _groupRepo.Query().ToListAsync())
                 .Where(g => g.UserIds.Contains(currentUserId) && !hiddenGroupIds.Contains(g.GroupId))
-                .ToListAsync();
+                .ToList();
             return (allUsers, allGroups);
         }
         public async Task<List<int>> GetHiddenUserIds(int currentUserId)
