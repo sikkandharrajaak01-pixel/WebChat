@@ -762,11 +762,7 @@
                 method: 'POST'
             });
             if (response.ok) {
-                const user = allUsersLoaded.find(u => u.id === userId);
-                if (user) {
-                    user.friendshipStatus = { status: "Pending", isSender: true };
-                }
-                renderAddFriendsList(allUsersLoaded);
+                await loadUsersForFriends(true);
             }
         } catch (err) {
             console.error("Failed to send request:", err);

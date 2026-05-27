@@ -10,5 +10,11 @@ namespace Chat_App.Repositories
             => await _context.pushSubscription.FirstOrDefaultAsync(s => s.UserId == userId && s.Endpoint == endpoint);
         public async Task AddAsync(PushSubscription subscription) { _context.pushSubscription.Add(subscription); await _context.SaveChangesAsync(); }
         public async Task SaveChangesAsync() { await _context.SaveChangesAsync(); }
+        public async Task DeleteByUserIdAsync(int userId)
+        {
+            var subs = await _context.pushSubscription.Where(s => s.UserId == userId).ToListAsync();
+            _context.pushSubscription.RemoveRange(subs);
+            await _context.SaveChangesAsync();
+        }
     }
 }

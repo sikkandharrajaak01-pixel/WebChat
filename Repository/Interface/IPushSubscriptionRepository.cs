@@ -6,5 +6,6 @@ namespace Chat_App.Repositories
         Task<PushSubscription?> GetByUserIdAndEndpointAsync(int userId, string endpoint);
         Task AddAsync(PushSubscription subscription);
         Task SaveChangesAsync();
+        Task DeleteByUserIdAsync(int userId);
     }
 }

@@ -1,6 +1,5 @@
 ﻿using Chat_App.Models;
 using Chat_App.Services.Dtos;
-
 namespace Chat_App.Services.Interfaces
 {
     public interface IAccountService
@@ -17,5 +16,6 @@ namespace Chat_App.Services.Interfaces
         Task<bool> VerifyOtp(string email, string otp);
         Task<(bool Success, string? Error)> ResetPassword(string email, string newPassword);
         Task<EmailValidationResultDto> ValidateEmail(string email);
+        Task ClearPushSubscriptions(int userId);
     }
 }

@@ -137,6 +137,9 @@ namespace Chat_App.Controllers
         }
         public async Task<IActionResult> Logout()
         {
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (int.TryParse(userIdClaim, out var userId))
+                await _accountService.ClearPushSubscriptions(userId);
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return RedirectToAction("Login", "Account");
         }

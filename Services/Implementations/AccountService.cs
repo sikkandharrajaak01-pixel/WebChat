@@ -11,18 +11,21 @@ namespace Chat_App.Services.Implementations
     {
         private readonly IUserRepository _userRepo;
         private readonly IGroupMessageRepository _groupMsgRepo;
+        private readonly IPushSubscriptionRepository _pushRepo;
         private readonly Cloudinary _cloudinary;
         private readonly IConfiguration _configuration;
         private readonly IEmailService _emailService;
         public AccountService(
             IUserRepository userRepo,
             IGroupMessageRepository groupMsgRepo,
+            IPushSubscriptionRepository pushRepo,
             Cloudinary cloudinary,
             IConfiguration configuration,
             IEmailService emailService)
         {
             _userRepo = userRepo;
             _groupMsgRepo = groupMsgRepo;
+            _pushRepo = pushRepo;
             _cloudinary = cloudinary;
             _configuration = configuration;
             _emailService = emailService;
@@ -39,6 +42,8 @@ namespace Chat_App.Services.Implementations
             => await _userRepo.GetByIdAsync(userId);
         public async Task CreateUser(UsersList user)
             => await _userRepo.AddAsync(user);
+        public async Task ClearPushSubscriptions(int userId)
+            => await _pushRepo.DeleteByUserIdAsync(userId);
         public async Task<(string? ImageUrl, string? FileName, string? FileType)> UploadProfilePhoto(IFormFile photo)
         {
             using var stream = photo.OpenReadStream();

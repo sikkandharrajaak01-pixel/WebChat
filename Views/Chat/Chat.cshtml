@@ -28,7 +28,21 @@
                     }
                     else if (ViewBag.LastSeen != null)
                     {
-                        <span>last seen @ViewBag.LastSeen.ToString("h:mm tt").Replace(".", ":")</span>
+                        var dt = (DateTime)ViewBag.LastSeen;
+                        var t = dt.ToString("h:mm tt").Replace(".", ":");
+                        var d = (DateTime.Now.Date - dt.Date).Days;
+                        if (d == 0)
+                        {
+                            <span>last seen @t</span>
+                        }
+                        else if (d == 1)
+                        {
+                            <span>last seen yesterday at @t</span>
+                        }
+                        else
+                        {
+                            <span>last seen @d days ago at @t</span>
+                        }
                     }
                     <span class="conn-status" id="connStatus" style="display:none;"></span>
                 </div>
@@ -3123,12 +3137,25 @@ connection.start()
     if (offlineTimeout) return;
     offlineTimeout = setTimeout(function () {
     offlineTimeout = null;
-    const time = new Date(lastSeen).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
-    }).replace(".",":");
-    const newHtml = '<span>last seen ' + time.toString().replace(".",":") + '</span>';
+                    const lastSeenDate = new Date(lastSeen);
+                    const time = lastSeenDate.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                    }).replace(".",":");
+                    const now = new Date();
+                    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const seenStart = new Date(lastSeenDate.getFullYear(), lastSeenDate.getMonth(), lastSeenDate.getDate());
+                    const diffDays = Math.round((todayStart - seenStart) / (1000 * 60 * 60 * 24));
+                    var label;
+                    if (diffDays === 0) {
+                    label = 'last seen ' + time;
+                    } else if (diffDays === 1) {
+                    label = 'last seen yesterday at ' + time;
+                    } else {
+                    label = 'last seen ' + diffDays + ' days ago ';
+                    }
+                    const newHtml = '<span>' + label + '</span>';
     if (newHtml !== lastStatusHtml) {
     lastStatusHtml = newHtml;
     statusElement.innerHTML = newHtml;
