@@ -30,7 +30,7 @@
                     {
                         var dt = (DateTime)ViewBag.LastSeen;
                         var t = dt.ToString("h:mm tt").Replace(".", ":");
-                        var d = (DateTime.UtcNow.Date - dt.Date).Days;
+                        var d = (DateTime.Now.Date - dt.Date).Days;
                         if (d == 0)
                         {
                             <span>last seen @t</span>
@@ -41,7 +41,7 @@
                         }
                         else
                         {
-                            <span>last seen @d days ago at @t</span>
+                            <span>last seen @d days ago </span>
                         }
                     }
                     <span class="conn-status" id="connStatus" style="display:none;"></span>
@@ -2081,6 +2081,9 @@ connection.start()
     connectionReady = true;
     return connection.invoke("RegisterUser", senderId);
 })
+.then(function () {
+    markVisibleReceivedMessagesAsRead();
+})
 .catch(err => console.error("Connection failed: ", err));
     // Do NOT call MarkMessagesAsRead here — the IntersectionObserver
    
@@ -2419,6 +2422,9 @@ connection.start()
     </div>
     <div class="delete-menu-item" onclick="toggleStarred(${wrapper.dataset.messageId}, ${isStared})">
     <i class="${starIcon}"></i> ${starLabel}
+    </div>
+    <div class="delete-menu-item" onclick="forwardMessage(${wrapper.dataset.messageId}, '${escAttr(message)}', '${fileType || ''}', '${escAttr(fileName || '')}')">
+    <i class="fas fa-share"></i> Forward
     </div>`;
     if (fileType) {
     menuItems += `
@@ -2435,6 +2441,9 @@ connection.start()
     </div>
     <div class="delete-menu-item" onclick="toggleStarred(${wrapper.dataset.messageId}, ${isStared})">
     <i class="${starIcon}"></i> ${starLabel}
+    </div>
+    <div class="delete-menu-item" onclick="forwardMessage(${wrapper.dataset.messageId}, '${escAttr(message)}', '${fileType || ''}', '${escAttr(fileName || '')}')">
+    <i class="fas fa-share"></i> Forward
     </div>`;
     if (fileType) {
     menuItems += `
@@ -2707,6 +2716,20 @@ connection.start()
     currentDeleteMenu.style.visibility = 'hidden';
     currentDeleteMenu = null;
     }
+    }
+
+    function forwardMessage(messageId, message, fileType, fileName) {
+    closeDeleteMenu();
+    // Store message data in sessionStorage for the Forward page
+    const forwardData = {
+        messageId: messageId,
+        message: message,
+        fileType: fileType,
+        fileName: fileName
+    };
+    sessionStorage.setItem('forwardMessage', JSON.stringify(forwardData));
+    // Redirect to Forward page
+    window.location.href = '/Chat/Forward';
     }
 
     // ── Video thumbnail + duration ─────────────────────────────────────────────
@@ -3184,11 +3207,12 @@ connection.start()
 
     // Only mark messages from the other person as read
     if (msgSenderId !== senderId && msgSenderId > 0) {
-    if (connectionReady) {
-    connection.invoke("MarkMessagesAsRead", msgSenderId, senderId);
-    }
-    readObserver.unobserve(wrapper); // stop watching once marked
-    }
+                if (connectionReady) {
+                    connection.invoke("MarkMessagesAsRead", msgSenderId, senderId);
+                    readObserver.unobserve(wrapper); // stop watching once marked
+                }
+                // Don't unobserve if connection isn't ready — markVisibleReceivedMessagesAsRead() handles it later
+            }
     }
     });
     }, { threshold: 0.5 }); // message must be 50% visible
@@ -3215,6 +3239,23 @@ connection.start()
     } catch (err) {
     console.error("Failed to check friend status:", err);
     }
+    }
+
+     function markVisibleReceivedMessagesAsRead() {
+        const container = document.getElementById('messagesContainer');
+        if (!container) return;
+        const containerRect = container.getBoundingClientRect();
+        document.querySelectorAll('.message-wrapper.received').forEach(function(wrapper) {
+            var rect = wrapper.getBoundingClientRect();
+            var isVisible = rect.top < containerRect.bottom && rect.bottom > containerRect.top;
+            if (isVisible) {
+                var msgSenderId = parseInt(wrapper.dataset.senderId || '0');
+                if (msgSenderId !== senderId && msgSenderId > 0 && connectionReady) {
+                    connection.invoke("MarkMessagesAsRead", msgSenderId, senderId);
+                    readObserver.unobserve(wrapper);
+                }
+            }
+        });
     }
 
     function updateFriendRequestUI() {
@@ -3861,7 +3902,7 @@ connection.start()
     tempBubble.dataset.filepath = result.filePath;
     locallyShownFiles.add(result.filePath);
 
-    connection.invoke("SendFileMessage", senderId, receiverId, result.filePath, 'audio', 'Voice message')
+        connection.invoke("SendFileMessage", senderId, receiverId, result.filePath, 'audio', 'Voice message', result.duration)
     .catch(err => console.error('SendFileMessage failed:', err));
 
     } catch (err) {
@@ -4220,7 +4261,7 @@ connection.start()
     }
 
     // ─── Cleanup ──────────────────────────────────────────────────────────────────
-    function cleanupCall() {
+   function cleanupCall() {
     pc?.close();
     pc = null;
     remoteDescSet = false;
@@ -4228,17 +4269,18 @@ connection.start()
     currentRemoteUserId = null;
     currentCallType = null;
     callInProgress = false;
-
     if (callTimerInterval) {
-    clearInterval(callTimerInterval);
-    callTimerInterval = null;
+        clearInterval(callTimerInterval);
+        callTimerInterval = null;
     }
-
     localStream?.getTracks().forEach(t => t.stop());
     localStream = null;
     document.getElementById("remoteVideo").srcObject = null;
     document.getElementById("localVideo").srcObject = null;
-    }
+    // 👇 ADD THESE TWO LINES
+    document.getElementById('activeCallOverlay').style.display = 'none';
+    document.getElementById('incomingCallOverlay').style.display = 'none';
+}
 
     // ─── ICE flush ────────────────────────────────────────────────────────────────
     async function flushPendingCandidates() {
@@ -4344,25 +4386,23 @@ connection.start()
     }
 
     // ─── Callee: accept incoming call ─────────────────────────────────────────────
-    async function acceptCall() {
+   async function acceptCall() {
     currentRemoteUserId = pendingCallerId;
     currentCallType = pendingCallType;
     callInProgress = true;
-
     document.getElementById('incomingCallOverlay').style.display = 'none';
-
-    await connection.invoke("AnswerCall", pendingCallerId, true);
-
     try {
-    localStream = await getLocalMedia(pendingCallType);
-    showActiveCallScreen(pendingCallType);
-    createPeerConnection();
-    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+        localStream = await getLocalMedia(pendingCallType);
+        showActiveCallScreen(pendingCallType);
+        createPeerConnection();
+        localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+        // 👇 MOVE THIS AFTER PC is ready — avoids race condition
+        await connection.invoke("AnswerCall", pendingCallerId, true);
     } catch (err) {
-    console.error('acceptCall error:', err);
-    cleanupCall();
+        console.error('acceptCall error:', err);
+        cleanupCall();
     }
-    }
+}
 
     // ─── Callee: decline incoming call ────────────────────────────────────────────
     async function declineCall() {

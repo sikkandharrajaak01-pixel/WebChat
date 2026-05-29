@@ -20,7 +20,7 @@ namespace Chat_App.Services.Implementations
             var publicId = $"uploads/{Guid.NewGuid()}";
             var cloudUrl = await UploadToCloudinary(file, stream, fileType, publicId);
             var dto = new UploadResultDto { FilePath = cloudUrl, FileName = file.FileName };
-            if (fileType == "video") dto.Duration = _lastVideoDuration;
+            if (fileType is "video" or "audio") dto.Duration = _lastVideoDuration;
             return dto;
         }
 
@@ -30,9 +30,10 @@ namespace Chat_App.Services.Implementations
             var publicId = $"uploads/{Guid.NewGuid()}";
             var cloudUrl = await UploadToCloudinary(file, stream, fileType, publicId);
             var dto = new UploadResultDto { FilePath = cloudUrl, FileName = file.FileName };
-            if (fileType == "video") dto.Duration = _lastVideoDuration;
+            if (fileType is "video" or "audio") dto.Duration = _lastVideoDuration;
             return dto;
         }
+
         private async Task<string> UploadToCloudinary(IFormFile file, Stream stream, string fileType, string publicId)
         {
             switch (fileType)
@@ -64,15 +65,15 @@ namespace Chat_App.Services.Implementations
                     }
                 case "audio":
                     {
-                        var audioFileName = $"audio_{Guid.NewGuid()}.webm";
-                        var uploadParams = new RawUploadParams
+                        var uploadParams = new VideoUploadParams
                         {
-                            File = new FileDescription(audioFileName, stream),
-                            PublicId = $"uploads/{Guid.NewGuid()}"
+                            File = new FileDescription(file.FileName, stream),
+                            PublicId = publicId
                         };
                         var result = await _cloudinary.UploadAsync(uploadParams);
                         if (result.Error != null)
                             throw new Exception(result.Error.Message);
+                        _lastVideoDuration = result.Duration;
                         return result.SecureUrl.ToString();
                     }
                 default:

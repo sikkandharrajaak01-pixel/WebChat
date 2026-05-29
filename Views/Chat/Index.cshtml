@@ -387,7 +387,7 @@
                         <div class="card-visual">
                             @if (moment.FileType == "video")
                             {
-                                <video src="@moment.MediaUrl" muted loop playsinline preload="metadata" onclick="this.paused ? this.play() : this.pause()"></video>
+                                <video src="@moment.MediaUrl" loop playsinline preload="metadata" onclick="this.paused ? this.play() : this.pause()"></video>
                             }
                             else
                             {
