@@ -280,7 +280,7 @@
                                 <span class="user-name">@conv.DisplayName</span>
                                 @if (conv.LastMessageTime.HasValue)
                                 {
-                                    <span class="msg-time">@conv.LastMessageTime.Value.ToString("h:mm tt").Replace(".",":")</span>
+                                    <span class="msg-time">@conv.LastMessageTime.Value.ToLocalTime().ToString("h:mm tt").Replace(".",":")</span>
                                 }
                             </div>
                             <div class="user-preview">
