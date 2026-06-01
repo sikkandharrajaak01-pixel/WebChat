@@ -288,7 +288,6 @@ namespace Chat_App.Services.Implementations
                 message.DeletedStatus = "EveryOne";
                 message.DeletedForUserId = null;
 
-                _groupMsgRepo.Update(message);
                 await _groupMsgRepo.SaveChangesAsync();
 
                 if (message.GroupId <= 0)
@@ -327,7 +326,6 @@ namespace Chat_App.Services.Implementations
                 message.DeletedStatus = "Forme";
                 message.DeletedForUserId = currentUserId;
 
-                _groupMsgRepo.Update(message);
                 await _groupMsgRepo.SaveChangesAsync();
 
                 if (message.GroupId <= 0)
@@ -354,7 +352,6 @@ namespace Chat_App.Services.Implementations
             if (message == null || message.SenderId != currentUserId) return null;
             message.DeletedStatus = null;
             message.DeletedForUserId = null;
-            _groupMsgRepo.Update(message);
             await _groupMsgRepo.SaveChangesAsync();
             await _notification.InvalidateGroupMessageCache(message.GroupId);
             var group = await _groupRepo.GetByIdAsync(message.GroupId);
