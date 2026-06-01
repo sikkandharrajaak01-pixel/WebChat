@@ -266,26 +266,75 @@ namespace Chat_App.Services.Implementations
         }
         public async Task DeleteGroupMessageForEveryone(int messageId, int currentUserId)
         {
-            var message = await _groupMsgRepo.GetByIdAsync(messageId);
-            if (message == null || message.SenderId != currentUserId) return;
-            message.DeletedStatus = "EveryOne";
-            message.DeletedForUserId = null;
-            _groupMsgRepo.Update(message);
-            await _groupMsgRepo.SaveChangesAsync();
-            await _notification.InvalidateGroupMessageCache(message.GroupId);
-            var group = await _groupRepo.GetByIdAsync(message.GroupId);
-            if (group?.UserIds != null)
-                await _notification.NotifyGroupMessageDeleted(messageId, message.GroupId, group.UserIds);
+            try
+            {
+                var message = await _groupMsgRepo.GetByIdAsync(messageId);
+
+                if (message == null || message.SenderId != currentUserId)
+                    return;
+
+                message.DeletedStatus = "EveryOne";
+                message.DeletedForUserId = null;
+
+                _groupMsgRepo.Update(message);
+                await _groupMsgRepo.SaveChangesAsync();
+
+                if (message.GroupId <= 0)
+                    return;
+
+                await _notification.InvalidateGroupMessageCache(message.GroupId);
+
+                var group = await _groupRepo.GetByIdAsync(message.GroupId);
+
+                if (group?.UserIds != null && group.UserIds.Any())
+                {
+                    await _notification.NotifyGroupMessageDeleted(
+                        messageId,
+                        message.GroupId,
+                        group.UserIds
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                // THIS IS WHAT YOU ARE CURRENTLY MISSING
+                Console.WriteLine("DeleteGroupMessageForEveryone ERROR: " + ex);
+
+                throw; // or return gracefully
+            }
         }
         public async Task DeleteGroupMessageForMe(int messageId, int currentUserId)
         {
-            var message = await _groupMsgRepo.GetByIdAsync(messageId);
-            if (message == null) return;
-            message.DeletedStatus = "Forme";
-            message.DeletedForUserId = currentUserId;
-            _groupMsgRepo.Update(message);
-            await _groupMsgRepo.SaveChangesAsync();
-            await _notification.InvalidateGroupMessageCache(message.GroupId);
+            try
+            {
+                var message = await _groupMsgRepo.GetByIdAsync(messageId);
+
+                if (message == null)
+                    return;
+
+                message.DeletedStatus = "Forme";
+                message.DeletedForUserId = currentUserId;
+
+                _groupMsgRepo.Update(message);
+                await _groupMsgRepo.SaveChangesAsync();
+
+                if (message.GroupId <= 0)
+                    return;
+
+                try
+                {
+                    await _notification.InvalidateGroupMessageCache(message.GroupId);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Cache invalidate failed: " + ex.Message);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("DeleteGroupMessageForMe ERROR: " + ex);
+                throw;
+            }
         }
         public async Task<DeleteResult?> UndoGroupDelete(int messageId, int currentUserId)
         {
