@@ -10,5 +10,6 @@ namespace Chat_App.Repositories
         void Update(GroupMessage message);
         Task SaveChangesAsync();
         IQueryable<GroupMessage> Query();
+        Task<Dictionary<int, (int Delivered, int Read)>> GetCountsForMessagesAsync(List<int> messageIds);
     }
 }
