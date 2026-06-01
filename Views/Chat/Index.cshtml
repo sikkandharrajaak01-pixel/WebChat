@@ -378,7 +378,7 @@
                             </div>
                             <div class="card-meta">
                                 <span class="card-name">@(usersDict?.ContainsKey(moment.UserId) == true ? usersDict[moment.UserId].username : "Unknown")</span>
-                                <span class="card-time time-remaining" data-expires="@moment.ExpiresAt.ToString("o")"></span>
+                              <span class="card-time time-remaining" data-expires="@moment.ExpiresAt.ToUniversalTime().ToString("o")"></span>
                             </div>
                             <span class="live-badge"><i class="fas fa-circle"></i> LIVE</span>
                             @if (moment.UserId == currentUserId)
@@ -2089,10 +2089,10 @@ fetch('/Chat/DeleteMoment', {
     }
     function updateTimeRemaining() {
         document.querySelectorAll('.time-remaining').forEach(function (el) {
-            const expires = new Date(el.getAttribute('data-expires') + 'Z');
+            const expires = new Date(el.getAttribute('data-expires'));
             const now = new Date();
             const diff = expires - now;
-            if (diff <= 0) { el.textContent = 'Expired'; return; }
+           if (isNaN(diff) || diff <= 0) { el.textContent = 'Expired'; return; }
             const h = Math.floor(diff / 3600000);
             const m = Math.floor((diff % 3600000) / 60000);
             el.textContent = h + 'h ' + m + 'm remaining';
