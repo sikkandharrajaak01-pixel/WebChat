@@ -243,7 +243,9 @@
                                 <span class="user-name"><i class="fas fa-users" style="margin-right: 6px; color: #667eea;"></i>@conv.DisplayName</span>
                                 @if (conv.LastMessageTime.HasValue)
                                 {
-                                    <span class="msg-time">@conv.LastMessageTime.Value.ToLocalTime().ToString("h:mm tt").Replace(".",":")</span>
+                                    <span class="="msg-time"
+      data-utc="@conv.LastMessageTime.Value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")">
+</span>
                                 }
                             </div>
                             <div class="user-preview">
@@ -280,7 +282,9 @@
                                 <span class="user-name">@conv.DisplayName</span>
                                 @if (conv.LastMessageTime.HasValue)
                                 {
-                                    <span class="msg-time">@conv.LastMessageTime.Value.ToLocalTime().ToString("h:mm tt").Replace(".",":")</span>
+                                    <span class="="msg-time"
+      data-utc="@conv.LastMessageTime.Value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")">
+</span>
                                 }
                             </div>
                             <div class="user-preview">
@@ -2103,4 +2107,42 @@ fetch('/Chat/DeleteMoment', {
         sessionStorage.removeItem('activeTab');
         showTab(savedTab);
     }
+    function formatChatTimestamps() {
+    document.querySelectorAll('.msg-time[data-utc]').forEach(function (el) {
+        var d = new Date(el.getAttribute('data-utc'));
+        var now = new Date();
+
+        var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        var yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        var md = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+        var ts = d.toLocaleTimeString([], {
+            hour: 'numeric',
+            minute: '2-digit'
+        });
+
+        if (md.getTime() === today.getTime()) {
+            el.textContent = ts;
+        }
+        else if (md.getTime() === yesterday.getTime()) {
+            el.textContent = 'Yesterday';
+        }
+        else if (d > new Date(now.getTime() - 7 * 86400000)) {
+            el.textContent = d.toLocaleDateString([], {
+                weekday: 'long'
+            });
+        }
+        else {
+            el.textContent = d.toLocaleDateString([], {
+                month: 'numeric',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        }
+    });
+}
+
+formatChatTimestamps();
 </script>
