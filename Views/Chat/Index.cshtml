@@ -2107,33 +2107,42 @@ fetch('/Chat/DeleteMoment', {
         sessionStorage.removeItem('activeTab');
         showTab(savedTab);
     }
-   function formatChatTimestamps() {
+    function formatChatTimestamps() {
     document.querySelectorAll('.msg-time[data-utc]').forEach(function (el) {
-
         var d = new Date(el.getAttribute('data-utc'));
         var now = new Date();
 
         var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        var msgDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        var yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
 
-        // Today -> Show Time
-        if (msgDate.getTime() === today.getTime()) {
-            el.textContent = d.toLocaleTimeString([], {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
+        var md = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+        var ts = d.toLocaleTimeString([], {
+            hour: 'numeric',
+            minute: '2-digit'
+        });
+
+        if (md.getTime() === today.getTime()) {
+            el.textContent = ts;
+        }
+        else if (md.getTime() === yesterday.getTime()) {
+            el.textContent = 'Yesterday';
+        }
+        else if (d > new Date(now.getTime() - 7 * 86400000)) {
+            el.textContent = d.toLocaleDateString([], {
+                weekday: 'long'
             });
         }
         else {
-            // Older messages -> Show Month + Date
-            el.textContent = d.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric'
+            el.textContent = d.toLocaleDateString([], {
+                month: 'numeric',
+                day: 'numeric',
+                year: 'numeric'
             });
         }
     });
 }
-document.addEventListener("DOMContentLoaded", function () {
-    formatChatTimestamps();
-});
+
+formatChatTimestamps();
 </script>
