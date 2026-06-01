@@ -27,5 +27,23 @@ namespace Chat_App.Repositories
                      .ToDictionaryAsync(x => x.GroupId, x => x.Count);
         public async Task AddAsync(GroupMessageRecipient recipient) { _context.groupMessageRecipient.Add(recipient); await _context.SaveChangesAsync(); }
         public async Task SaveChangesAsync() { await _context.SaveChangesAsync(); }
+        public async Task<Dictionary<int, (int Delivered, int Read)>> GetCountsForMessagesAsync(List<int> messageIds)
+        {
+            var rows = await _context.groupMessageRecipient
+                .Where(g => messageIds.Contains(g.GroupMessageId))
+                .GroupBy(g => g.GroupMessageId)
+                .Select(g => new
+                {
+                    MessageId = g.Key,
+                    Delivered = g.Count(x => x.IsDelivered),
+                    Read = g.Count(x => x.IsRead)
+                })
+                .ToListAsync();
+
+            return rows.ToDictionary(
+                r => r.MessageId,
+                r => (r.Delivered, r.Read)
+            );
+        }
     }
 }

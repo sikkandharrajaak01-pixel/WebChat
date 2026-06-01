@@ -25,23 +25,6 @@ namespace Chat_App.Repositories
             => await _context.groupMessage.Where(m => m.IsStared == true).ToListAsync();
         public void Update(GroupMessage message) { _context.groupMessage.Update(message); }
         public async Task SaveChangesAsync() { await _context.SaveChangesAsync(); }
-        public async Task<Dictionary<int, (int Delivered, int Read)>> GetCountsForMessagesAsync(List<int> messageIds)
-        {
-            var rows = await _context.groupMessageRecipient
-                .Where(g => messageIds.Contains(g.GroupMessageId))
-                .GroupBy(g => g.GroupMessageId)
-                .Select(g => new
-                {
-                    MessageId = g.Key,
-                    Delivered = g.Count(x => x.IsDelivered),
-                    Read = g.Count(x => x.IsRead)
-                })
-                .ToListAsync();
-
-            return rows.ToDictionary(
-                r => r.MessageId,
-                r => (r.Delivered, r.Read)
-            );
-        }
+       
     }
 }

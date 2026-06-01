@@ -11,5 +11,6 @@ namespace Chat_App.Repositories
         Task AddAsync(GroupMessageRecipient recipient);
         Task SaveChangesAsync();
         IQueryable<GroupMessageRecipient> Query();
+        Task<Dictionary<int, (int Delivered, int Read)>> GetCountsForMessagesAsync(List<int> messageIds);
     }
 }
