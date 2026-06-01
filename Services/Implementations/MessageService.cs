@@ -63,18 +63,29 @@ namespace Chat_App.Services.Implementations
             var hasMore = messages.Count > take;
             if (hasMore) messages.RemoveAt(messages.Count - 1);
             messages.Reverse();
+
             var group = await _groupRepo.GetByIdAsync(groupId);
             var totalMembers = group?.UserIds?.Count ?? 0;
             var totalRecipients = totalMembers > 0 ? totalMembers - 1 : 0;
+
+            // Batch: get all counts for all messages in ONE query
+            var messageIds = messages
+                .Where(m => m.SenderId == currentUserId)
+                .Select(m => m.GroupMessageId)
+                .ToList();
+
+            Dictionary<int, (int Delivered, int Read)> countMap = new();
+
+            if (messageIds.Any() && totalRecipients > 0)
+            {
+                countMap = await _groupMsgRecipientRepo.GetCountsForMessagesAsync(messageIds);
+            }
+
             var result = new List<GroupMessageDto>();
             foreach (var m in messages)
             {
-                int deliveredCount = 0, readCount = 0;
-                if (m.SenderId == currentUserId && totalRecipients > 0)
-                {
-                    deliveredCount = await _groupMsgRecipientRepo.GetDeliveredCountAsync(m.GroupMessageId);
-                    readCount = await _groupMsgRecipientRepo.GetReadCountAsync(m.GroupMessageId);
-                }
+                countMap.TryGetValue(m.GroupMessageId, out var counts);
+
                 result.Add(new GroupMessageDto
                 {
                     GroupMessageId = m.GroupMessageId,
@@ -88,13 +99,14 @@ namespace Chat_App.Services.Implementations
                     FileName = m.DeletedStatus == "EveryOne" ? null : m.FileName,
                     IsMine = m.SenderId == currentUserId,
                     IsDeleted = m.DeletedStatus == "EveryOne",
-                    DeliveredCount = deliveredCount,
-                    ReadCount = readCount,
+                    DeliveredCount = counts.Delivered,
+                    ReadCount = counts.Read,
                     TotalRecipients = totalRecipients,
                     IsStared = m.IsStared ?? false,
                     Duration = m.Duration
                 });
             }
+
             return new GroupMessageListResult { Messages = result, HasMore = hasMore };
         }
         public async Task<GroupMessageStatusResult> GetGroupMessageStatus(int currentUserId, int messageId)
