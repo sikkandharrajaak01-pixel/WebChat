@@ -243,7 +243,7 @@
                                 <span class="user-name"><i class="fas fa-users" style="margin-right: 6px; color: #667eea;"></i>@conv.DisplayName</span>
                                 @if (conv.LastMessageTime.HasValue)
                                 {
-                                    <span class="msg-time">@conv.LastMessageTime.Value.ToString("h:mm tt").Replace(".",":")</span>
+                                    <span class="msg-time">@conv.LastMessageTime.Value.ToLocalTime().ToString("h:mm tt").Replace(".",":")</span>
                                 }
                             </div>
                             <div class="user-preview">
@@ -1919,22 +1919,24 @@ function closeGroupPopup() {
 
     // ===== Tab Switching =====
     function showTab(tab) {
-        const chatsTab = document.querySelector('.tab-item:first-child');
-        const momentsTab = document.querySelector('.tab-item:last-child');
-        const userList = document.querySelector('.user-list');
-        const momentsBody = document.getElementById('momentsBody');
-        if (tab === 'chats') {
-            chatsTab.classList.add('active');
-            momentsTab.classList.remove('active');
-            userList.style.display = '';
-            momentsBody.style.display = 'none';
-        } else {
-            momentsTab.classList.add('active');
-            chatsTab.classList.remove('active');
-            userList.style.display = 'none';
-            momentsBody.style.display = '';
-        }
+    const chatsTab = document.querySelector('.tab-item:first-child');
+    const momentsTab = document.querySelector('.tab-item:last-child');
+    const userList = document.querySelector('.user-list');
+    const momentsBody = document.getElementById('momentsBody');
+    if (tab === 'chats') {
+        chatsTab.classList.add('active');
+        momentsTab.classList.remove('active');
+        userList.style.display = '';
+        momentsBody.style.display = 'none';
+        // Pause all moments videos
+        document.querySelectorAll('#momentsFeed video').forEach(v => v.pause());
+    } else {
+        momentsTab.classList.add('active');
+        chatsTab.classList.remove('active');
+        userList.style.display = 'none';
+        momentsBody.style.display = '';
     }
+}
 
     // ===== Moments Upload =====
     let selectedFile = null;
