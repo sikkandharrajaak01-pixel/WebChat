@@ -493,7 +493,7 @@ public class ChatHub : Hub
                     dbUser.IsOnline = false;
                     dbUser.LastSeen = DateTime.UtcNow;
                     await _db.SaveChangesAsync();
-                    await Clients.All.SendAsync("UserStatusChanged", userId.Value, false, DateTime.Now);
+                    await Clients.All.SendAsync("UserStatusChanged", userId.Value, false, DateTime.UtcNow);
                 }
             }
         }

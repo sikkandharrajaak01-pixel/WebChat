@@ -52,7 +52,7 @@ namespace Chat_App.Services.Implementations
                     IsRead = m.IsRead,
                     IsStared = m.IsStared,
                     IsDeleted = false,
-                    Duration=m.Duration
+                    Duration = m.Duration
                 };
             }).Where(m => m != null).Cast<MessageDto>().ToList();
             return new MessageListResult { Messages = result, HasMore = hasMore };
@@ -92,7 +92,7 @@ namespace Chat_App.Services.Implementations
                     ReadCount = readCount,
                     TotalRecipients = totalRecipients,
                     IsStared = m.IsStared ?? false,
-                    Duration=m.Duration
+                    Duration = m.Duration
                 });
             }
             return new GroupMessageListResult { Messages = result, HasMore = hasMore };
@@ -113,15 +113,15 @@ namespace Chat_App.Services.Implementations
             foreach (var member in allMembers)
             {
                 recipientDict.TryGetValue(member.Id, out var recipient);
-               
-               var dto = new RecipientStatusDto
-               {
-                   UserId = member.Id,
-                   Username = member.username,
-                   ProfileImage = member.ProfileImagePath,
-                   ReadAt = recipient?.ReadAt,
-                   DeliveredAt = recipient?.DeliveredAt
-               };
+
+                var dto = new RecipientStatusDto
+                {
+                    UserId = member.Id,
+                    Username = member.username,
+                    ProfileImage = member.ProfileImagePath,
+                    ReadAt = recipient?.ReadAt,
+                    DeliveredAt = recipient?.DeliveredAt
+                };
                 if (recipient != null && recipient.IsRead)
                     result.Read.Add(dto);
                 else if (recipient != null && recipient.IsDelivered)
