@@ -42,7 +42,7 @@ public class ChatHub : Hub
         if (user != null)
         {
             user.IsOnline = true;
-            user.LastSeen = DateTime.Now;
+            user.LastSeen = DateTime.UtcNow;
             await _db.SaveChangesAsync();
             if (!wasOnline)
             {
@@ -66,7 +66,7 @@ public class ChatHub : Hub
                 foreach (var recipient in undeliveredGroupRecipients)
                 {
                     recipient.IsDelivered = true;
-                    recipient.DeliveredAt = DateTime.Now;
+                    recipient.DeliveredAt = DateTime.UtcNow;
                 }
                 await _db.SaveChangesAsync();
                 var affectedGroupMsgIds = undeliveredGroupRecipients.Select(r => r.GroupMessageId).Distinct();
@@ -88,7 +88,7 @@ public class ChatHub : Hub
                     }
                 }
             }
-            await Clients.All.SendAsync("UserStatusChanged", userId, true, DateTime.Now);
+            await Clients.All.SendAsync("UserStatusChanged", userId, true, DateTime.UtcNow);
         }
     }
     public async Task SendMessage(int senderId, int receiverId, string message)
@@ -126,7 +126,7 @@ public class ChatHub : Hub
             SenderId = senderId,
             ReceiverId = receiverId,
             Text = message,
-            SentAt = DateTime.Now,
+            SentAt = DateTime.UtcNow,
             BlockedStatus = isBlocked
         };
         _db.message.Add(msg);
@@ -195,7 +195,7 @@ public class ChatHub : Hub
             SenderId = senderId,
             ReceiverId = receiverId,
             Text = filePath,
-            SentAt = DateTime.Now,
+            SentAt = DateTime.UtcNow,
             FileType = fileType,
             FileName = fileName,
             Duration = duration,
@@ -272,7 +272,7 @@ public class ChatHub : Hub
             SenderName = sender.username,
             SenderProfileImage = sender.ProfileImagePath,
             Text = message,
-            SentAt = DateTime.Now
+            SentAt = DateTime.UtcNow
         };
         _db.groupMessage.Add(msg);
         await _db.SaveChangesAsync();
@@ -327,7 +327,7 @@ public class ChatHub : Hub
             SenderName = sender.username,
             SenderProfileImage = sender.ProfileImagePath,
             Text = filePath,
-            SentAt = DateTime.Now,
+            SentAt = DateTime.UtcNow,
             FileType = fileType,
             FileName = fileName,
             Duration = duration
@@ -455,7 +455,7 @@ public class ChatHub : Hub
             .FirstOrDefaultAsync(r => r.GroupMessageId == messageId && r.UserId == userId);
         if (recipient == null || recipient.IsDelivered) return;
         recipient.IsDelivered = true;
-        recipient.DeliveredAt = DateTime.Now;
+        recipient.DeliveredAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
         var group = await _db.group.FindAsync(groupId);
         if (group?.UserIds == null) return;
@@ -480,7 +480,7 @@ public class ChatHub : Hub
             .FirstOrDefaultAsync(r => r.GroupMessageId == messageId && r.UserId == userId);
         if (recipient == null || recipient.IsRead) return;
         recipient.IsRead = true;
-        recipient.ReadAt = DateTime.Now;
+        recipient.ReadAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
         var group = await _db.group.FindAsync(groupId);
         if (group?.UserIds == null) return;
@@ -515,9 +515,9 @@ public class ChatHub : Hub
                 if (dbUser != null)
                 {
                     dbUser.IsOnline = false;
-                    dbUser.LastSeen = DateTime.Now;
+                    dbUser.LastSeen = DateTime.UtcNow;
                     await _db.SaveChangesAsync();
-                    await Clients.All.SendAsync("UserStatusChanged", userId.Value, false, DateTime.Now);
+                    await Clients.All.SendAsync("UserStatusChanged", userId.Value, false, DateTime.UtcNow);
                 }
             }
         }
