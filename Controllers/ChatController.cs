@@ -5,7 +5,9 @@ using Chat_App.Services.Implementations;
 using Chat_App.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 namespace Chat_App.Controllers
 {
@@ -24,6 +26,7 @@ namespace Chat_App.Controllers
         private readonly IMomentService momentService;
         private readonly IMomentRepository _momentRepo;
         private readonly IUserRepository _userRepo;
+        private readonly ApplicationDBContext dbContext;
         public ChatController(
             IChatIndexService chatIndex,
             IMessageService message,
@@ -36,7 +39,8 @@ namespace Chat_App.Controllers
             IPushService push,
             IMomentService momentService,
             IMomentRepository momentRepo,
-            IUserRepository userRepo)
+            IUserRepository userRepo,
+            ApplicationDBContext context)
         {
             _chatIndex = chatIndex;
             _message = message;
@@ -50,6 +54,7 @@ namespace Chat_App.Controllers
             this.momentService = momentService;
             _momentRepo = momentRepo;
             _userRepo = userRepo;
+            dbContext = context;
         }
         private int CurrentUserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
         [HttpPost]
@@ -102,14 +107,24 @@ namespace Chat_App.Controllers
             var user = await _profile.GetProfile(userId);
             ViewBag.CurrentUserProfileImage = user?.ProfileImagePath;
             ViewBag.CurrentUserUsername = user?.username;
+            ViewBag.CurrentUserId = userId;
+            ViewBag.CurrentUsername = user?.username;
+
+            // ✅ Admin check
+            bool isAdmin = User.IsInRole("Admin"); // or however you store the role
+            ViewBag.IsAdmin = isAdmin;
+            if (isAdmin)
+            {
+                var allUsers = await _userRepo.GetAllUsersWithLastMessageAsync(userId); // pass userId
+                return View(allUsers);
+            }
             var conversations = await _chatIndex.GetConversations(userId);
             var moments = await momentService.GetActiveMoments(userId);
             var userIds = moments.Select(m => m.UserId).ToList();
             var usersDict = await _userRepo.GetByIdsDictionaryAsync(userIds);
             ViewBag.Moments = moments;
             ViewBag.Users = usersDict;
-            ViewBag.CurrentUserId = userId;
-            ViewBag.CurrentUsername = user?.username;
+
             return View(conversations);
         }
         public IActionResult HiddenAccess()
@@ -169,12 +184,26 @@ namespace Chat_App.Controllers
         public IActionResult Chat(int id)
         {
             var userId = CurrentUserId;
-            var (isFriend, requestStatus, isSender, receiver, currentUser, isBlocked, relationship) = _group.GetChatData(id, userId);
-            if (!isFriend)
+            bool isAdmin = User.IsInRole("Admin");
+
+            var (isFriend, requestStatus, isSender, receiver,
+                currentUser, isBlocked, relationship)
+                = _group.GetChatData(id, userId);
+
+            ViewBag.IsAdmin = isAdmin;
+            ViewBag.IsFriend = isFriend;
+
+            // Check if the receiver is an admin
+            bool isReceiverAdmin = receiver != null && receiver.Role == "Admin";
+            ViewBag.IsReceiverAdmin = isReceiverAdmin;
+           
+
+            if (!isFriend && !isAdmin)
             {
                 ViewBag.RequestStatus = requestStatus ?? "None";
                 ViewBag.IsSender = isSender;
             }
+
             if (receiver != null)
             {
                 ViewBag.ReceiverName = receiver.username;
@@ -182,9 +211,11 @@ namespace Chat_App.Controllers
                 ViewBag.IsOnline = receiver.IsOnline;
                 ViewBag.LastSeen = receiver.LastSeen;
             }
+
             ViewBag.IsBlocked = isBlocked;
             ViewBag.Id = id;
             ViewBag.RelationShip = relationship;
+
             return View();
         }
         public IActionResult GroupChat(int id)
@@ -495,6 +526,229 @@ namespace Chat_App.Controllers
         {
             var ok = await momentService.DeleteMoment(momentId, CurrentUserId);
             return ok ? Json(new { success = true }) : BadRequest(new { success = false, error = "Not found or unauthorized" });
+        }
+
+        [HttpGet]
+        public IActionResult Forward()
+        {
+            return View();
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetForwardRecipients()
+        {
+            try
+            {
+                // Get friends (connected users)
+                var friends = await _friend.GetFriends(CurrentUserId);
+                var users = friends.Select(f => new ForwardRecipientDto
+                {
+                    Id = f.Id,
+                    Username = f.Username,
+                    ProfileImagePath = f.ProfileImagePath,
+                    IsOnline = f.IsOnline,
+                    LastSeen = f.LastSeen
+                }).ToList();
+
+                // Get user's groups
+                using var scope = HttpContext.RequestServices.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDBContext>();
+
+                var userGroups = dbContext.group
+                    .Where(g => g.UserIds.Contains(CurrentUserId))
+                    .ToList();
+
+                var groups = userGroups.Select(g => new ForwardGroupDto
+                {
+                    GroupId = g.GroupId,
+                    GroupName = g.GroupName,
+                    ProfileImagePath = g.ProfileImagePath,
+                    UserIds = g.UserIds
+                }).ToList();
+
+                return Json(new { users, groups });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { error = ex.Message, users = new List<ForwardRecipientDto>(), groups = new List<ForwardGroupDto>() });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ForwardOld()
+        {
+            // Get forward message data from session
+            var forwardDataJson = HttpContext.Session.GetString("ForwardMessage");
+            if (string.IsNullOrEmpty(forwardDataJson))
+            {
+                return RedirectToAction("Index");
+            }
+
+            var message = System.Text.Json.JsonSerializer.Deserialize<ForwardMessageDto>(forwardDataJson)
+                ?? new ForwardMessageDto();
+
+            // Get friends (connected users)
+            var friends = await _friend.GetFriends(CurrentUserId);
+            var users = friends.Select(f => new ForwardRecipientDto
+            {
+                Id = f.Id,
+                Username = f.Username,
+                ProfileImagePath = f.ProfileImagePath,
+                IsOnline = f.IsOnline,
+                LastSeen = f.LastSeen
+            }).ToList();
+
+            // Get user's groups
+            var groups = new List<ForwardGroupDto>();
+            using var scope = HttpContext.RequestServices.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDBContext>();
+
+            var userGroups = dbContext.group
+                .Where(g => g.UserIds.Contains(CurrentUserId))
+                .ToList();
+
+            groups = userGroups.Select(g => new ForwardGroupDto
+            {
+                GroupId = g.GroupId,
+                GroupName = g.GroupName,
+                ProfileImagePath = g.ProfileImagePath,
+                UserIds = g.UserIds
+            }).ToList();
+
+            var model = new ForwardViewModel
+            {
+                Message = message,
+                Users = users,
+                Groups = groups
+            };
+
+            return View(model);
+        }
+
+
+
+
+
+
+
+        [HttpPost]
+        public async Task<IActionResult> ForwardMessage([FromBody] ForwardRequest request)
+        {
+            try
+            {
+                var currentUser = await _profile.GetProfile(CurrentUserId);
+                var currentUsername = currentUser?.Name ?? "Someone";
+                var currentUserProfileImage = currentUser?.ProfileImagePath;
+
+                foreach (var recipient in request.Recipients)
+                {
+                    if (recipient.Type == "user")
+                    {
+                        // Forward to user
+                        var msg = new Message
+                        {
+                            SenderId = CurrentUserId,
+                            ReceiverId = recipient.Id,
+                            Text = request.Text,
+                            FileType = request.FileType,
+                            FileName = request.FileName,
+                            SentAt = DateTime.UtcNow,
+                            IsDelivered = false,
+                            IsRead = false,
+                            DeletedStatus = "None",
+                            IsForwarded = true,
+                            OriginalSenderId = request.MessageId > 0 ? CurrentUserId : null
+                        };
+
+                        dbContext.message.Add(msg);
+                        await dbContext.SaveChangesAsync();
+
+                        // Send real-time notification via SignalR
+                        var connIds = ConnectionManager.GetConnections(recipient.Id);
+                        var hubContext = HttpContext.RequestServices.GetRequiredService<IHubContext<ChatHub>>();
+
+                        foreach (var connId in connIds)
+                        {
+                            await hubContext.Clients.Client(connId).SendAsync(
+                                "ReceiveMessage",
+                                CurrentUserId,
+                                request.Text,
+                                msg.MessageId
+                            );
+                        }
+                    }
+                    else if (recipient.Type == "group")
+                    {
+                        // Forward to group
+                        var groupMsg = new GroupMessage
+                        {
+                            GroupId = recipient.Id,
+                            SenderId = CurrentUserId,
+                            SenderName = $"{currentUsername} (forwarded)",
+                            SenderProfileImage = currentUserProfileImage,
+                            Text = request.Text,
+                            FileType = request.FileType,
+                            FileName = request.FileName,
+                            SentAt = DateTime.UtcNow,
+                            DeletedStatus = "None",
+                            IsForwarded = true,
+                            OriginalMessageId = request.MessageId > 0 ? request.MessageId : null
+                        };
+
+                        dbContext.groupMessage.Add(groupMsg);
+                        await dbContext.SaveChangesAsync();
+
+                        // Get group members and send notifications
+                        var group = dbContext.group.FirstOrDefault(g => g.GroupId == recipient.Id);
+                        if (group != null)
+                        {
+                            var hubContext = HttpContext.RequestServices.GetRequiredService<IHubContext<ChatHub>>();
+
+                            foreach (var memberId in group.UserIds)
+                            {
+                                if (memberId == CurrentUserId) continue;
+
+                                // Save delivery status
+                                var recipientStatus = new GroupMessageRecipient
+                                {
+                                    GroupMessageId = groupMsg.GroupMessageId,
+                                    UserId = memberId,
+                                    IsDelivered = false,
+                                    IsRead = false
+                                };
+                                dbContext.groupMessageRecipient.Add(recipientStatus);
+
+                                // Send real-time notification
+                                var connIds = ConnectionManager.GetConnections(memberId);
+                                foreach (var connId in connIds)
+                                {
+                                    await hubContext.Clients.Client(connId).SendAsync(
+                                        "ReceiveGroupMessage",
+                                        CurrentUserId,
+                                        $"{currentUsername} (forwarded)",
+                                        currentUserProfileImage,
+                                        recipient.Id,
+                                        request.Text,
+                                        groupMsg.GroupMessageId,
+                                        groupMsg.SentAt.ToString("o")
+                                    );
+                                }
+                            }
+
+                            await dbContext.SaveChangesAsync();
+                        }
+                    }
+                }
+
+                // Clear the forward message from session
+                HttpContext.Session.Remove("ForwardMessage");
+
+                return Json(new ForwardResult { Success = true });
+            }
+            catch (Exception ex)
+            {
+                return Json(new ForwardResult { Success = false, Message = ex.Message });
+            }
         }
     }
 }

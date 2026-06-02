@@ -11,7 +11,5 @@ namespace Chat_App.Repositories
         void Update(Message message);
         Task SaveChangesAsync();
         IQueryable<Message> Query();
-       
-
     }
 }

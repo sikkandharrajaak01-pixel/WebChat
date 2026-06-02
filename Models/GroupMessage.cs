@@ -16,6 +16,9 @@ namespace Chat_App.Models
 
         public bool? IsStared { get; set; } = false;
         public double? Duration { get; set; }
+
+        public bool IsForwarded { get; set; } = false;
+        public int? OriginalMessageId { get; set; }
     }
 }
 

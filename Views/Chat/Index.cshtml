@@ -28,12 +28,17 @@
             </div>
             
             <div class="settings-wrapper">
-                 <button class="settings-btn" onclick="CreateGroup()" title="Create Group">
-                    <i class="fa-solid fa-plus"></i>
-                </button>
-                <button class="settings-btn" onclick="window.location.href='/Chat/Friends'" title="Add Friends">
-                    <i class="fas fa-user-plus"></i>
-                </button>
+                   @if (ViewBag.IsAdmin != true)
+                {
+                    <button class="settings-btn" onclick="CreateGroup()" title="Create Group">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+
+                    <button class="settings-btn" onclick="window.location.href='/Chat/Friends'" title="Add Friends">
+                        <i class="fas fa-user-plus"></i>
+                    </button>                        
+                }
+
                 <button class="settings-btn" onclick="toggleSettings()" title="Settings">
                     <i class="fas fa-cog"></i>
                 </button>
@@ -42,11 +47,13 @@
                     <button class="menu-item" onclick="openUploadSection()">
                         <i class="fas fa-image"></i> Upload Profile 
                     </button>
-
-                    <button class="menu-item" onclick="hidechat()">
-                       <i class="fa-solid fa-eye-slash"></i> Hide Chat
-                    </button>
-                     <button class="menu-item" onclick="StaredMessage()">
+                    @if (ViewBag.IsAdmin != true)
+                    {
+                        <button class="menu-item" onclick="hidechat()">
+                            <i class="fa-solid fa-eye-slash"></i> Hide Chat
+                        </button>            
+                    }
+                    <button class="menu-item" onclick="StaredMessage()">
                        <i class="fa-regular fa-star"></i>Stared Messages
                     </button>
                      <button class="menu-item" onclick="yourProfile()">
@@ -200,137 +207,153 @@
         </div>
     </div>
     <div class="tab-nav">
-        <a href="#" class="tab-item active" onclick="showTab('chats'); return false;">
-            <i class="fas fa-comment-dots"></i> Chats
-        </a>
-        <a href="#" class="tab-item" onclick="showTab('moments'); return false;">
-            <i class="fas fa-camera"></i> Moments
-        </a>
-    </div>
-    <!-- User List -->
-    <div class="user-list">
-        @if (Model.Count == 0)
+        @if (ViewBag.IsAdmin != true)
         {
-            <div class="empty-state">
-                <div class="empty-icon">
-                    <i class="fas fa-user-friends"></i>
-                </div>
-                <h3>No conversations yet</h3>
-                <p>Start a new chat to see it here</p>
-            </div>
+            <a href="#" class="tab-item active" onclick="showTab('chats'); return false;">
+
+                <i class="fas fa-comment-dots"></i> All Users
+            </a>            
         }
-        else
+         else
         {
-            foreach (var conv in Model)
+            <a href="#" class="tab-item active" onclick="showTab('chats'); return false;">
+
+                <i class="fas fa-comment-dots"></i> All Users
+            </a>            
+        }
+        @if (ViewBag.IsAdmin != true)
+        {
+            <a href="#" class="tab-item" onclick="showTab('moments'); return false;">
+                <i class="fas fa-camera"></i> Moments
+            </a>            
+        }
+    </div>
+
+    <!-- User List -->
+<div class="user-list">
+    @if (Model.Count == 0)
+    {
+        <div class="empty-state">
+            <div class="empty-icon">
+                <i class="fas fa-user-friends"></i>
+            </div>
+            <h3>No conversations yet</h3>
+            <p>Start a new chat to see it here</p>
+        </div>
+    }
+    else
+    {
+        foreach (var conv in Model)
+        {
+            @if (conv.IsGroup)
             {
-                @if (conv.IsGroup)
-                {
-                    <a href="/Chat/GroupChat/@conv.Id" class="user-item">
-                        <div class="user-avatar-wrapper">
-                            <div class="user-avatar" style="background: linear-gradient(135deg, #f093fb, #f5576c);">
-                                @if (!string.IsNullOrEmpty(conv.ProfileImagePath))
-                                {
-                                    <img src="@conv.ProfileImagePath" alt="@conv.DisplayName" class="avatar-img" />
-                                }
-                                else
-                                {
-                                    <span><i class="fas fa-users"></i></span>
-                                }
-                            </div>
-                        </div>
-                        <div class="user-info">
-                            <div class="user-header">
-                                <span class="user-name"><i class="fas fa-users" style="margin-right: 6px; color: #667eea;"></i>@conv.DisplayName</span>
-                                @if (conv.LastMessageTime.HasValue)
-                                {
-                                    <span class="msg-time"
-      data-utc="@conv.LastMessageTime.Value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")">
-</span>
-                                }
-                            </div>
-                            <div class="user-preview">
-                                <span class="last-message">@conv.LastMessageText</span>
-                                @if (conv.UnreadCount > 0)
-                                {
-                                    <span class="unread-badge">@conv.UnreadCount</span>
-                                }
-                            </div>
-                        </div>
-                    </a>
-                }
-                else
-                {
-                    <a href="/Chat/Chat/@conv.Id" class="user-item">
-                        <div class="user-avatar-wrapper">
-                            <div class="user-avatar">
-                                @if (!string.IsNullOrEmpty(conv.ProfileImagePath))
-                                {
-                                    <img src="@conv.ProfileImagePath" alt="@conv.DisplayName" class="avatar-img" />
-                                }
-                                else
-                                {
-                                    <span>@conv.DisplayName.Substring(0, 1).ToUpper()</span>
-                                }
-                            </div>
-                            @if (conv.IsOnline)
+                <a href="/Chat/GroupChat/@conv.Id" class="user-item">
+                    <div class="user-avatar-wrapper">
+                        <div class="user-avatar" style="background: linear-gradient(135deg, #f093fb, #f5576c);">
+                            @if (!string.IsNullOrEmpty(conv.ProfileImagePath))
                             {
-                                <span class="online-indicator"></span>
+                                <img src="@conv.ProfileImagePath" alt="@conv.DisplayName" class="avatar-img" />
+                            }
+                            else
+                            {
+                                <span><i class="fas fa-users"></i></span>
                             }
                         </div>
-                        <div class="user-info">
-                            <div class="user-header">
-                                <span class="user-name">@conv.DisplayName</span>
-                                @if (conv.LastMessageTime.HasValue)
+                    </div>
+                    <div class="user-info">
+                        <div class="user-header">
+                            <span class="user-name"><i class="fas fa-users" style="margin-right: 6px; color: #667eea;"></i>@conv.DisplayName</span>
+                            @if (conv.LastMessageTime.HasValue)
+                            {
+                                <span class="msg-time"
+                                      data-utc="@conv.LastMessageTime.Value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")">
+                                </span>
+                            }
+                        </div>
+                        <div class="user-preview">
+                            <span class="last-message">@conv.LastMessageText</span>
+                            @if (conv.UnreadCount > 0)
+                            {
+                                <span class="unread-badge">@conv.UnreadCount</span>
+                            }
+                        </div>
+                    </div>
+                </a>
+            }
+            else
+            {
+                <a href="/Chat/Chat/@conv.Id" class="user-item">
+                    <div class="user-avatar-wrapper">
+                        <div class="user-avatar">
+                            @if (!string.IsNullOrEmpty(conv.ProfileImagePath))
+                            {
+                                <img src="@conv.ProfileImagePath" alt="@conv.DisplayName" class="avatar-img" />
+                            }
+                            else
+                            {
+                                <span>@conv.DisplayName.Substring(0, 1).ToUpper()</span>
+                            }
+                        </div>
+                        @if (conv.IsOnline)
+                        {
+                            <span class="online-indicator"></span>
+                        }
+                    </div>
+                    <div class="user-info">
+                        <div class="user-header">
+                            <span class="user-name">@conv.DisplayName</span>
+                            @if (conv.LastMessageTime.HasValue)
+                            {
+                                <span class="msg-time"
+                                      data-utc="@conv.LastMessageTime.Value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")">
+                                </span>
+                            }
+                        </div>
+                        <div class="user-preview">
+                            <span class="last-message">
+                                @if (!string.IsNullOrEmpty(conv.FileType))
                                 {
-                                    <span class="msg-time"
-      data-utc="@conv.LastMessageTime.Value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")">
-</span>
-                                }
-                            </div>
-                            <div class="user-preview">
-                                <span class="last-message">
-                                    @if (!string.IsNullOrEmpty(conv.FileType))
+                                    if (conv.FileType.StartsWith("image/"))
                                     {
-                                        if (conv.FileType.StartsWith("image/"))
-                                        {
-                                            <i class="fas fa-image"></i>
-                                        }
-                                        else if (conv.FileType.StartsWith("video/"))
-                                        {
-                                            <i class="fas fa-video"></i>
-                                        }
-                                        else if (conv.FileType == "audio")
-                                        {
-                                            <i class="fas fa-microphone"></i>
-                                        }
-                                        else
-                                        {
-                                            <i class="fas fa-file"></i>
-                                        }
-                                        @conv.FileName
+                                        <i class="fas fa-image"></i>
+                                    }
+                                    else if (conv.FileType.StartsWith("video/"))
+                                    {
+                                        <i class="fas fa-video"></i>
+                                    }
+                                    else if (conv.FileType == "audio")
+                                    {
+                                        <i class="fas fa-microphone"></i>
                                     }
                                     else
                                     {
-                                        @(string.IsNullOrEmpty(conv.LastMessageText) ? "Click to start chatting" : conv.LastMessageText)
+                                        <i class="fas fa-file"></i>
                                     }
-                                </span>
-                                @if (conv.UnreadCount > 0)
-                                {
-                                    <span class="unread-badge">@conv.UnreadCount</span>
+                                    @conv.FileName
                                 }
-                            </div>
+                                else
+                                {
+                                    @(string.IsNullOrEmpty(conv.LastMessageText) ? "Click to start chatting" : conv.LastMessageText)
+                                }
+                            </span>
+                            @if (conv.UnreadCount > 0)
+                            {
+                                <span class="unread-badge">@conv.UnreadCount</span>
+                            }
                         </div>
-                    </a>
-                }
+                    </div>
+                </a>
             }
         }
-    </div>
+    }
+</div>
     <!-- Moments Body (hidden by default) -->
     @{
         var moments = ViewBag.Moments as List<Moment>;
         var usersDict = ViewBag.Users as Dictionary<int, UsersList>;
         var currentUserId = (int)ViewBag.CurrentUserId;
     }
+
     <div class="moments-body" id="momentsBody" style="display:none;">
         <!-- Pulse Bar -->
         <div class="pulse-bar">

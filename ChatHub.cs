@@ -42,7 +42,7 @@ public class ChatHub : Hub
         if (user != null)
         {
             user.IsOnline = true;
-            user.LastSeen = DateTime.UtcNow;
+            user.LastSeen = DateTime.Now;
             await _db.SaveChangesAsync();
             if (!wasOnline)
             {
@@ -66,7 +66,7 @@ public class ChatHub : Hub
                 foreach (var recipient in undeliveredGroupRecipients)
                 {
                     recipient.IsDelivered = true;
-                    recipient.DeliveredAt = DateTime.UtcNow;
+                    recipient.DeliveredAt = DateTime.Now;
                 }
                 await _db.SaveChangesAsync();
                 var affectedGroupMsgIds = undeliveredGroupRecipients.Select(r => r.GroupMessageId).Distinct();
@@ -88,43 +88,58 @@ public class ChatHub : Hub
                     }
                 }
             }
-            await Clients.All.SendAsync("UserStatusChanged", userId, true, DateTime.UtcNow);
+            await Clients.All.SendAsync("UserStatusChanged", userId, true, DateTime.Now);
         }
     }
     public async Task SendMessage(int senderId, int receiverId, string message)
     {
         senderId = int.Parse(Context.User.FindFirstValue(ClaimTypes.NameIdentifier));
-        var friendship = await _db.friendRequests
-            .FirstOrDefaultAsync(f =>
-                (f.SenderId == senderId && f.ReceiverId == receiverId) ||
-                (f.SenderId == receiverId && f.ReceiverId == senderId));
-        if (friendship == null || friendship.Status != "Accepted")
-        {
-            foreach (var connId in ConnectionManager.GetConnections(senderId))
-                await Clients.Client(connId).SendAsync("ReceiveMessage", senderId, message, -1);
-            return;
-        }
+
         var receiver = await _db.user.FindAsync(receiverId);
+        var sender = await _db.user.FindAsync(senderId);
+
+        // Skip friendship check if either side is Admin
+        bool senderIsAdmin = sender?.Role == "Admin";
+        bool receiverIsAdmin = receiver?.Role == "Admin";
+
+        if (!senderIsAdmin && !receiverIsAdmin)
+        {
+            var friendship = await _db.friendRequests
+                .FirstOrDefaultAsync(f =>
+                    (f.SenderId == senderId && f.ReceiverId == receiverId) ||
+                    (f.SenderId == receiverId && f.ReceiverId == senderId));
+
+            if (friendship == null || friendship.Status != "Accepted")
+            {
+                foreach (var connId in ConnectionManager.GetConnections(senderId))
+                    await Clients.Client(connId).SendAsync("ReceiveMessage", senderId, message, -1);
+                return;
+            }
+        }
+
         var isBlocked = receiver?.BlockedUsers != null
             && receiver.BlockedUsers.Split(',', StringSplitOptions.RemoveEmptyEntries)
                 .Contains(senderId.ToString());
+
         var msg = new Message
         {
             SenderId = senderId,
             ReceiverId = receiverId,
             Text = message,
-            SentAt = DateTime.UtcNow,
+            SentAt = DateTime.Now,
             BlockedStatus = isBlocked
         };
         _db.message.Add(msg);
         await _db.SaveChangesAsync();
         await DeleteMessageCache(senderId, receiverId);
+
         if (isBlocked)
         {
             foreach (var connId in ConnectionManager.GetConnections(senderId))
                 await Clients.Client(connId).SendAsync("ReceiveMessage", senderId, message, msg.MessageId);
             return;
         }
+
         var receiverConnections = ConnectionManager.GetConnections(receiverId).ToList();
         if (receiverConnections.Any())
         {
@@ -144,7 +159,6 @@ public class ChatHub : Hub
         }
         else
         {
-            var sender = await _db.user.FindAsync(senderId);
             if (sender != null)
             {
                 foreach (var connId in ConnectionManager.GetConnections(senderId))
@@ -156,13 +170,23 @@ public class ChatHub : Hub
     public async Task SendFileMessage(int senderId, int receiverId, string filePath, string fileType, string fileName, double? duration = null)
     {
         senderId = int.Parse(Context.User.FindFirstValue(ClaimTypes.NameIdentifier));
-        var friendship = await _db.friendRequests
-            .FirstOrDefaultAsync(f =>
-                (f.SenderId == senderId && f.ReceiverId == receiverId) ||
-                (f.SenderId == receiverId && f.ReceiverId == senderId));
-        if (friendship == null || friendship.Status != "Accepted")
-            return;
+
         var receiver = await _db.user.FindAsync(receiverId);
+        var sender = await _db.user.FindAsync(senderId);
+
+        bool senderIsAdmin = sender?.Role == "Admin";
+        bool receiverIsAdmin = receiver?.Role == "Admin";
+
+        if (!senderIsAdmin && !receiverIsAdmin)
+        {
+            var friendship = await _db.friendRequests
+                .FirstOrDefaultAsync(f =>
+                    (f.SenderId == senderId && f.ReceiverId == receiverId) ||
+                    (f.SenderId == receiverId && f.ReceiverId == senderId));
+
+            if (friendship == null || friendship.Status != "Accepted")
+                return;
+        }
         var isBlocked = receiver?.BlockedUsers != null
             && receiver.BlockedUsers.Split(',', StringSplitOptions.RemoveEmptyEntries)
                 .Contains(senderId.ToString());
@@ -171,7 +195,7 @@ public class ChatHub : Hub
             SenderId = senderId,
             ReceiverId = receiverId,
             Text = filePath,
-            SentAt = DateTime.UtcNow,
+            SentAt = DateTime.Now,
             FileType = fileType,
             FileName = fileName,
             Duration = duration,
@@ -205,7 +229,7 @@ public class ChatHub : Hub
         }
         else
         {
-            var sender = await _db.user.FindAsync(senderId);
+           
             if (sender != null)
             {
                 foreach (var connId in ConnectionManager.GetConnections(senderId))
@@ -248,7 +272,7 @@ public class ChatHub : Hub
             SenderName = sender.username,
             SenderProfileImage = sender.ProfileImagePath,
             Text = message,
-            SentAt = DateTime.UtcNow
+            SentAt = DateTime.Now
         };
         _db.groupMessage.Add(msg);
         await _db.SaveChangesAsync();
@@ -303,7 +327,7 @@ public class ChatHub : Hub
             SenderName = sender.username,
             SenderProfileImage = sender.ProfileImagePath,
             Text = filePath,
-            SentAt = DateTime.UtcNow,
+            SentAt = DateTime.Now,
             FileType = fileType,
             FileName = fileName,
             Duration = duration
@@ -431,7 +455,7 @@ public class ChatHub : Hub
             .FirstOrDefaultAsync(r => r.GroupMessageId == messageId && r.UserId == userId);
         if (recipient == null || recipient.IsDelivered) return;
         recipient.IsDelivered = true;
-        recipient.DeliveredAt = DateTime.UtcNow;
+        recipient.DeliveredAt = DateTime.Now;
         await _db.SaveChangesAsync();
         var group = await _db.group.FindAsync(groupId);
         if (group?.UserIds == null) return;
@@ -456,7 +480,7 @@ public class ChatHub : Hub
             .FirstOrDefaultAsync(r => r.GroupMessageId == messageId && r.UserId == userId);
         if (recipient == null || recipient.IsRead) return;
         recipient.IsRead = true;
-        recipient.ReadAt = DateTime.UtcNow;
+        recipient.ReadAt = DateTime.Now;
         await _db.SaveChangesAsync();
         var group = await _db.group.FindAsync(groupId);
         if (group?.UserIds == null) return;
@@ -491,9 +515,9 @@ public class ChatHub : Hub
                 if (dbUser != null)
                 {
                     dbUser.IsOnline = false;
-                    dbUser.LastSeen = DateTime.UtcNow;
+                    dbUser.LastSeen = DateTime.Now;
                     await _db.SaveChangesAsync();
-                    await Clients.All.SendAsync("UserStatusChanged", userId.Value, false, DateTime.UtcNow);
+                    await Clients.All.SendAsync("UserStatusChanged", userId.Value, false, DateTime.Now);
                 }
             }
         }

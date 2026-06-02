@@ -35,6 +35,7 @@ namespace Chat_App.Models
         public string? HiddenPassword { get; set; }
 
         public int? Otp { get; set; }
+        public string? Role { get; set; }
 
     }
 }

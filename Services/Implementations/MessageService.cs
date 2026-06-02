@@ -52,7 +52,7 @@ namespace Chat_App.Services.Implementations
                     IsRead = m.IsRead,
                     IsStared = m.IsStared,
                     IsDeleted = false,
-                    Duration = m.Duration
+                    Duration=m.Duration
                 };
             }).Where(m => m != null).Cast<MessageDto>().ToList();
             return new MessageListResult { Messages = result, HasMore = hasMore };
@@ -63,29 +63,18 @@ namespace Chat_App.Services.Implementations
             var hasMore = messages.Count > take;
             if (hasMore) messages.RemoveAt(messages.Count - 1);
             messages.Reverse();
-
             var group = await _groupRepo.GetByIdAsync(groupId);
             var totalMembers = group?.UserIds?.Count ?? 0;
             var totalRecipients = totalMembers > 0 ? totalMembers - 1 : 0;
-
-            // Batch: get all counts for all messages in ONE query
-            var messageIds = messages
-                .Where(m => m.SenderId == currentUserId)
-                .Select(m => m.GroupMessageId)
-                .ToList();
-
-            Dictionary<int, (int Delivered, int Read)> countMap = new();
-
-            if (messageIds.Any() && totalRecipients > 0)
-            {
-                countMap = await _groupMsgRecipientRepo.GetCountsForMessagesAsync(messageIds);
-            }
-
             var result = new List<GroupMessageDto>();
             foreach (var m in messages)
             {
-                countMap.TryGetValue(m.GroupMessageId, out var counts);
-
+                int deliveredCount = 0, readCount = 0;
+                if (m.SenderId == currentUserId && totalRecipients > 0)
+                {
+                    deliveredCount = await _groupMsgRecipientRepo.GetDeliveredCountAsync(m.GroupMessageId);
+                    readCount = await _groupMsgRecipientRepo.GetReadCountAsync(m.GroupMessageId);
+                }
                 result.Add(new GroupMessageDto
                 {
                     GroupMessageId = m.GroupMessageId,
@@ -99,14 +88,13 @@ namespace Chat_App.Services.Implementations
                     FileName = m.DeletedStatus == "EveryOne" ? null : m.FileName,
                     IsMine = m.SenderId == currentUserId,
                     IsDeleted = m.DeletedStatus == "EveryOne",
-                    DeliveredCount = counts.Delivered,
-                    ReadCount = counts.Read,
+                    DeliveredCount = deliveredCount,
+                    ReadCount = readCount,
                     TotalRecipients = totalRecipients,
                     IsStared = m.IsStared ?? false,
-                    Duration = m.Duration
+                    Duration=m.Duration
                 });
             }
-
             return new GroupMessageListResult { Messages = result, HasMore = hasMore };
         }
         public async Task<GroupMessageStatusResult> GetGroupMessageStatus(int currentUserId, int messageId)
@@ -125,15 +113,15 @@ namespace Chat_App.Services.Implementations
             foreach (var member in allMembers)
             {
                 recipientDict.TryGetValue(member.Id, out var recipient);
-
-                var dto = new RecipientStatusDto
-                {
-                    UserId = member.Id,
-                    Username = member.username,
-                    ProfileImage = member.ProfileImagePath,
-                    ReadAt = recipient?.ReadAt,
-                    DeliveredAt = recipient?.DeliveredAt
-                };
+               
+               var dto = new RecipientStatusDto
+               {
+                   UserId = member.Id,
+                   Username = member.username,
+                   ProfileImage = member.ProfileImagePath,
+                   ReadAt = recipient?.ReadAt,
+                   DeliveredAt = recipient?.DeliveredAt
+               };
                 if (recipient != null && recipient.IsRead)
                     result.Read.Add(dto);
                 else if (recipient != null && recipient.IsDelivered)
@@ -278,73 +266,26 @@ namespace Chat_App.Services.Implementations
         }
         public async Task DeleteGroupMessageForEveryone(int messageId, int currentUserId)
         {
-            try
-            {
-                var message = await _groupMsgRepo.GetByIdAsync(messageId);
-
-                if (message == null || message.SenderId != currentUserId)
-                    return;
-
-                message.DeletedStatus = "EveryOne";
-                message.DeletedForUserId = null;
-
-                await _groupMsgRepo.SaveChangesAsync();
-
-                if (message.GroupId <= 0)
-                    return;
-
-                await _notification.InvalidateGroupMessageCache(message.GroupId);
-
-                var group = await _groupRepo.GetByIdAsync(message.GroupId);
-
-                if (group?.UserIds != null && group.UserIds.Any())
-                {
-                    await _notification.NotifyGroupMessageDeleted(
-                        messageId,
-                        message.GroupId,
-                        group.UserIds
-                    );
-                }
-            }
-            catch (Exception ex)
-            {
-                // THIS IS WHAT YOU ARE CURRENTLY MISSING
-                Console.WriteLine("DeleteGroupMessageForEveryone ERROR: " + ex);
-
-                throw; // or return gracefully
-            }
+            var message = await _groupMsgRepo.GetByIdAsync(messageId);
+            if (message == null || message.SenderId != currentUserId) return;
+            message.DeletedStatus = "EveryOne";
+            message.DeletedForUserId = null;
+            _groupMsgRepo.Update(message);
+            await _groupMsgRepo.SaveChangesAsync();
+            await _notification.InvalidateGroupMessageCache(message.GroupId);
+            var group = await _groupRepo.GetByIdAsync(message.GroupId);
+            if (group?.UserIds != null)
+                await _notification.NotifyGroupMessageDeleted(messageId, message.GroupId, group.UserIds);
         }
         public async Task DeleteGroupMessageForMe(int messageId, int currentUserId)
         {
-            try
-            {
-                var message = await _groupMsgRepo.GetByIdAsync(messageId);
-
-                if (message == null)
-                    return;
-
-                message.DeletedStatus = "Forme";
-                message.DeletedForUserId = currentUserId;
-
-                await _groupMsgRepo.SaveChangesAsync();
-
-                if (message.GroupId <= 0)
-                    return;
-
-                try
-                {
-                    await _notification.InvalidateGroupMessageCache(message.GroupId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("Cache invalidate failed: " + ex.Message);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("DeleteGroupMessageForMe ERROR: " + ex);
-                throw;
-            }
+            var message = await _groupMsgRepo.GetByIdAsync(messageId);
+            if (message == null) return;
+            message.DeletedStatus = "Forme";
+            message.DeletedForUserId = currentUserId;
+            _groupMsgRepo.Update(message);
+            await _groupMsgRepo.SaveChangesAsync();
+            await _notification.InvalidateGroupMessageCache(message.GroupId);
         }
         public async Task<DeleteResult?> UndoGroupDelete(int messageId, int currentUserId)
         {
@@ -352,6 +293,7 @@ namespace Chat_App.Services.Implementations
             if (message == null || message.SenderId != currentUserId) return null;
             message.DeletedStatus = null;
             message.DeletedForUserId = null;
+            _groupMsgRepo.Update(message);
             await _groupMsgRepo.SaveChangesAsync();
             await _notification.InvalidateGroupMessageCache(message.GroupId);
             var group = await _groupRepo.GetByIdAsync(message.GroupId);

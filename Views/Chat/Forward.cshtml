@@ -1,658 +1,561 @@
-@using Chat_App.Services.Dtos
-@using Chat_App.Models
 @{
-    var friends = ViewBag.Friends as List<FriendDto> ?? new List<FriendDto>();
-    var groups = ViewBag.Groups as List<GroupCredentials> ?? new List<GroupCredentials>();
+    ViewData["Title"] = "Forward Message";
 }
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
-
-<div class="fw-wrapper">
-
-    <!-- Ambient background blobs -->
-    <div class="fw-bg">
-        <div class="fw-blob fw-blob-1"></div>
-        <div class="fw-blob fw-blob-2"></div>
-        <div class="fw-blob fw-blob-3"></div>
-    </div>
-
-    <!-- Header -->
-    <header class="fw-header">
-        <a href="javascript:history.back()" class="fw-back">
-            <i class="fas fa-arrow-left"></i>
-        </a>
-        <div class="fw-header-text">
-            <h1>Forward Message</h1>
-            <p>Choose recipients below</p>
-        </div>
-        <div class="fw-header-badge" id="headerBadge" style="opacity:0;">
-            <span id="headerBadgeCount">0</span>
-        </div>
-    </header>
-
-    <!-- Message Preview -->
-    <div class="fw-preview">
-        <div class="fw-preview-tag">
-            <i class="fas fa-share"></i>
-            <span>Forwarding</span>
-        </div>
-        <div class="fw-preview-body" id="forwardPreviewContent"></div>
-    </div>
-
-    <!-- Search bar -->
-    <div class="fw-search-wrap">
-        <i class="fas fa-search fw-search-icon"></i>
-        <input type="text" class="fw-search" id="searchInput" placeholder="Search friends & groups…" oninput="filterList(this.value)" />
-    </div>
-
-    <!-- Recipients -->
-    <div class="fw-scroll">
-
-        @if (friends.Any())
-        {
-            <div class="fw-section-label">
-                <span class="fw-label-dot"></span>
-                Friends
-            </div>
-            <div class="fw-list" id="friendsList">
-                @foreach (var friend in friends)
-                {
-                    <label class="fw-item" data-type="user" data-id="@friend.Id" data-name="@friend.Username.ToLower()">
-                        <div class="fw-avatar @(string.IsNullOrEmpty(friend.ProfileImagePath) ? "fw-avatar-initials" : "")">
-                            @if (!string.IsNullOrEmpty(friend.ProfileImagePath))
-                            {
-                                <img src="@friend.ProfileImagePath" alt="@friend.Username" />
-                            }
-                            else
-                            {
-                                <span>@friend.Username.Substring(0, 1).ToUpper()</span>
-                            }
-                            @if (friend.IsOnline)
-                            {
-                                <span class="fw-online"></span>
-                            }
-                        </div>
-                        <div class="fw-info">
-                            <div class="fw-name">@friend.Username</div>
-                            <div class="fw-sub @(friend.IsOnline ? "fw-sub--online" : "")">
-                                @if (friend.IsOnline)
-                                {
-                                    <span class="fw-pulse"></span>
-                                }
-                                @(friend.IsOnline ? "Active now" : "Offline")
-                            </div>
-                        </div>
-                        <div class="fw-check-wrap">
-                            <input type="checkbox" class="recipient-checkbox" data-type="user" data-id="@friend.Id" />
-                            <span class="fw-checkmark"><i class="fas fa-check"></i></span>
-                        </div>
-                    </label>
-                }
-            </div>
-        }
-
-        @if (groups.Any())
-        {
-            <div class="fw-section-label">
-                <span class="fw-label-dot fw-label-dot--group"></span>
-                Groups
-            </div>
-            <div class="fw-list" id="groupsList">
-                @foreach (var group in groups)
-                {
-                    <label class="fw-item" data-type="group" data-id="@group.GroupId" data-name="@group.GroupName.ToLower()">
-                        <div class="fw-avatar fw-avatar--group @(string.IsNullOrEmpty(group.ProfileImagePath) ? "fw-avatar-initials" : "")">
-                            @if (!string.IsNullOrEmpty(group.ProfileImagePath))
-                            {
-                                <img src="@group.ProfileImagePath" alt="@group.GroupName" />
-                            }
-                            else
-                            {
-                                <i class="fas fa-users"></i>
-                            }
-                        </div>
-                        <div class="fw-info">
-                            <div class="fw-name">@group.GroupName</div>
-                            <div class="fw-sub">@group.UserIds.Count members</div>
-                        </div>
-                        <div class="fw-check-wrap">
-                            <input type="checkbox" class="recipient-checkbox" data-type="group" data-id="@group.GroupId" />
-                            <span class="fw-checkmark"><i class="fas fa-check"></i></span>
-                        </div>
-                    </label>
-                }
-            </div>
-        }
-
-        @if (!friends.Any() && !groups.Any())
-        {
-            <div class="fw-empty">
-                <div class="fw-empty-icon"><i class="fas fa-satellite-dish"></i></div>
-                <p>No one to forward to yet</p>
-                <span>Add friends to get started</span>
-            </div>
-        }
-
-        <div class="fw-empty fw-no-results" id="noResults" style="display:none;">
-            <div class="fw-empty-icon"><i class="fas fa-search"></i></div>
-            <p>No results found</p>
-        </div>
-    </div>
-
-    <!-- Bottom bar -->
-    <div class="fw-bottom">
-        <div class="fw-bottom-left">
-            <div class="fw-bottom-count">
-                <span id="bottomSelectedCount">0</span>
-            </div>
-            <span class="fw-bottom-label">selected</span>
-        </div>
-        <button class="fw-send" id="forwardSendBtn" onclick="sendForward()" disabled>
-            <span class="fw-send-text">Send Now</span>
-            <span class="fw-send-icon"><i class="fas fa-paper-plane"></i></span>
-        </button>
-    </div>
-</div>
 
 <style>
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body {
-        height: 100%; overflow: hidden;
-        font-family: 'DM Sans', sans-serif;
-        background: #080c14;
-    }
-
-    /* ── CSS Variables ─────────────────────────────── */
     :root {
-        --c-bg: #080c14;
-        --c-surface: rgba(255,255,255,0.04);
-        --c-surface-hover: rgba(255,255,255,0.07);
-        --c-border: rgba(255,255,255,0.07);
-        --c-accent: #00d4aa;
-        --c-accent-2: #0099ff;
-        --c-accent-glow: rgba(0, 212, 170, 0.25);
-        --c-group: #ff6b9d;
-        --c-group-glow: rgba(255, 107, 157, 0.2);
-        --c-text: #f0f4f8;
-        --c-text-muted: #5a6a7e;
-        --c-text-sub: #8896a6;
-        --c-online: #00e5a0;
-        --radius-card: 18px;
-        --radius-btn: 14px;
-        --shadow-card: 0 2px 16px rgba(0,0,0,0.3);
+        --primary-color: #6366f1;
+        --bg-gradient: linear-gradient(135deg, #e0e7ff 0%, #f0e6ff 50%, #e8e0f7 100%);
+        --surface: #ffffff;
+        --text-primary: #1f2937;
+        --text-secondary: #6b7280;
     }
 
-    /* ── Background Blobs ──────────────────────────── */
-    .fw-bg {
-        position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
-    }
-    .fw-blob {
-        position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.15;
-        animation: blobDrift 12s ease-in-out infinite alternate;
-    }
-    .fw-blob-1 {
-        width: 400px; height: 400px; top: -120px; left: -100px;
-        background: radial-gradient(circle, #00d4aa, #0099ff);
-        animation-duration: 14s;
-    }
-    .fw-blob-2 {
-        width: 350px; height: 350px; bottom: -100px; right: -80px;
-        background: radial-gradient(circle, #ff6b9d, #a855f7);
-        animation-duration: 18s; animation-delay: -6s;
-    }
-    .fw-blob-3 {
-        width: 250px; height: 250px; top: 50%; left: 60%;
-        background: radial-gradient(circle, #0099ff, transparent);
-        animation-duration: 10s; animation-delay: -3s;
-    }
-    @@keyframes blobDrift {
-        0%   { transform: translate(0, 0) scale(1); }
-        100% { transform: translate(30px, 20px) scale(1.08); }
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
     }
 
-    /* ── Wrapper ───────────────────────────────────── */
-    .fw-wrapper {
-        position: fixed; inset: 0;
-        width: 100%; max-width: 900px; margin: 0 auto;
-        height: 100vh; height: 100dvh;
-        background: rgba(8, 12, 20, 0.92);
-        backdrop-filter: blur(20px);
-        display: flex; flex-direction: column;
-        z-index: 10;
-        border-left: 1px solid var(--c-border);
-        border-right: 1px solid var(--c-border);
-    }
-    @@media (min-width: 540px) {
-        .fw-wrapper {
-            top: 20px; bottom: 20px; height: auto;
-            border-radius: 28px;
-            box-shadow: 0 40px 100px rgba(0,0,0,0.6), 0 0 0 1px var(--c-border);
-        }
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: var(--bg-gradient);
+        min-height: 100vh;
     }
 
-    /* ── Header ────────────────────────────────────── */
-    .fw-header {
-        display: flex; align-items: center; gap: 14px;
-        padding: 20px 20px 16px;
-        flex-shrink: 0;
-        border-bottom: 1px solid var(--c-border);
-        animation: slideDown 0.4s cubic-bezier(0.16,1,0.3,1);
+    .forward-container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        min-height: 100vh;
     }
-    @@keyframes slideDown { from { opacity:0; transform: translateY(-12px); } to { opacity:1; transform: translateY(0); } }
 
-    .fw-back {
-        width: 42px; height: 42px; flex-shrink: 0;
-        background: var(--c-surface);
-        border: 1px solid var(--c-border);
+    .forward-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 16px 20px;
+        background: var(--surface);
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);
+        margin-bottom: 20px;
+    }
+
+    .back-btn {
+        width: 44px;
+        height: 44px;
+        background: var(--primary-color);
         border-radius: 14px;
-        display: flex; align-items: center; justify-content: center;
-        color: var(--c-text); text-decoration: none; font-size: 15px;
-        transition: all 0.2s;
-    }
-    .fw-back:hover { background: var(--c-surface-hover); border-color: var(--c-accent); color: var(--c-accent); transform: translateX(-2px); }
-
-    .fw-header-text { flex: 1; }
-    .fw-header-text h1 { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; color: var(--c-text); letter-spacing: -0.3px; }
-    .fw-header-text p  { font-size: 12px; color: var(--c-text-muted); margin-top: 2px; }
-
-    .fw-header-badge {
-        min-width: 32px; height: 32px; padding: 0 10px;
-        background: linear-gradient(135deg, var(--c-accent), var(--c-accent-2));
-        border-radius: 10px;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 13px; font-weight: 700; color: #080c14;
-        transition: opacity 0.3s, transform 0.3s;
-        transform: scale(0.8);
-    }
-    .fw-header-badge.visible { opacity: 1 !important; transform: scale(1); }
-
-    /* ── Preview ───────────────────────────────────── */
-    .fw-preview {
-        margin: 16px 16px 0;
-        padding: 14px 16px;
-        background: var(--c-surface);
-        border: 1px solid var(--c-border);
-        border-radius: var(--radius-card);
-        flex-shrink: 0;
-        position: relative; overflow: hidden;
-        animation: fadeUp 0.4s 0.1s cubic-bezier(0.16,1,0.3,1) both;
-    }
-    .fw-preview::before {
-        content: '';
-        position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-        background: linear-gradient(180deg, var(--c-accent), var(--c-accent-2));
-        border-radius: 3px 0 0 3px;
-    }
-    .fw-preview-tag {
-        display: flex; align-items: center; gap: 6px;
-        font-size: 11px; font-weight: 600; color: var(--c-accent);
-        text-transform: uppercase; letter-spacing: 0.8px;
-        margin-bottom: 8px; margin-left: 2px;
-    }
-    .fw-preview-body {
-        font-size: 14px; color: var(--c-text-sub);
-        max-height: 56px; overflow: hidden;
-        line-height: 1.5; margin-left: 2px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        text-decoration: none;
+        transition: all 0.3s;
     }
 
-    /* ── Search ────────────────────────────────────── */
-    .fw-search-wrap {
-        position: relative; margin: 14px 16px 8px; flex-shrink: 0;
-        animation: fadeUp 0.4s 0.2s cubic-bezier(0.16,1,0.3,1) both;
-    }
-    .fw-search-icon {
-        position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
-        font-size: 13px; color: var(--c-text-muted); pointer-events: none;
-    }
-    .fw-search {
-        width: 100%; padding: 12px 14px 12px 40px;
-        background: var(--c-surface);
-        border: 1px solid var(--c-border);
-        border-radius: 12px;
-        color: var(--c-text); font-size: 14px; font-family: 'DM Sans', sans-serif;
-        outline: none; transition: all 0.2s;
-    }
-    .fw-search::placeholder { color: var(--c-text-muted); }
-    .fw-search:focus {
-        border-color: var(--c-accent);
-        box-shadow: 0 0 0 3px var(--c-accent-glow);
-        background: rgba(255,255,255,0.06);
+    .back-btn:hover {
+        transform: translateX(-2px);
+        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
     }
 
-    /* ── Scrollable list ───────────────────────────── */
-    .fw-scroll {
-        flex: 1; overflow-y: auto;
-        padding: 4px 16px 12px;
-    }
-    .fw-scroll::-webkit-scrollbar { width: 4px; }
-    .fw-scroll::-webkit-scrollbar-track { background: transparent; }
-    .fw-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
-
-    .fw-section-label {
-        display: flex; align-items: center; gap: 8px;
-        font-size: 11px; font-weight: 600; color: var(--c-text-muted);
-        text-transform: uppercase; letter-spacing: 1px;
-        padding: 14px 2px 8px;
-    }
-    .fw-label-dot {
-        width: 6px; height: 6px; border-radius: 50%;
-        background: var(--c-accent);
-        box-shadow: 0 0 6px var(--c-accent);
-    }
-    .fw-label-dot--group {
-        background: var(--c-group);
-        box-shadow: 0 0 6px var(--c-group);
+    .forward-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--text-primary);
     }
 
-    .fw-list { display: flex; flex-direction: column; gap: 4px; }
-
-    /* ── Item ──────────────────────────────────────── */
-    .fw-item {
-        display: flex; align-items: center; gap: 14px;
-        padding: 12px 14px;
-        border-radius: var(--radius-card);
-        cursor: pointer;
-        border: 1px solid transparent;
-        transition: background 0.15s, border-color 0.15s, transform 0.15s;
-        animation: fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both;
-        position: relative; overflow: hidden;
-    }
-    .fw-item:hover {
-        background: var(--c-surface-hover);
-        border-color: var(--c-border);
-        transform: translateX(2px);
-    }
-    .fw-item.is-selected {
-        background: rgba(0, 212, 170, 0.06);
-        border-color: rgba(0, 212, 170, 0.25);
-    }
-    .fw-item.is-selected::after {
-        content: '';
-        position: absolute; inset: 0; border-radius: var(--radius-card);
-        background: linear-gradient(90deg, rgba(0,212,170,0.04), transparent);
-        pointer-events: none;
+    .message-preview {
+        background: var(--surface);
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 20px rgba(99, 102, 241, 0.1);
     }
 
-    /* stagger children */
-    .fw-list .fw-item:nth-child(1) { animation-delay: 0.05s; }
-    .fw-list .fw-item:nth-child(2) { animation-delay: 0.10s; }
-    .fw-list .fw-item:nth-child(3) { animation-delay: 0.15s; }
-    .fw-list .fw-item:nth-child(4) { animation-delay: 0.20s; }
-    .fw-list .fw-item:nth-child(5) { animation-delay: 0.25s; }
-
-    @@keyframes fadeUp {
-        from { opacity:0; transform: translateY(10px); }
-        to   { opacity:1; transform: translateY(0); }
+    .message-preview-label {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
 
-    /* ── Avatar ────────────────────────────────────── */
-    .fw-avatar {
-        width: 46px; height: 46px; border-radius: 15px;
-        flex-shrink: 0; position: relative; overflow: visible;
-        display: flex; align-items: center; justify-content: center;
-    }
-    .fw-avatar img {
-        width: 46px; height: 46px; object-fit: cover;
-        border-radius: 15px;
-    }
-    .fw-avatar-initials {
-        background: linear-gradient(135deg, #1a2a3a, #0d1f2d);
-        border: 1px solid rgba(0, 212, 170, 0.2);
-        font-family: 'Space Grotesk', sans-serif;
-        font-size: 18px; font-weight: 700;
-        color: var(--c-accent);
-    }
-    .fw-avatar--group.fw-avatar-initials {
-        background: linear-gradient(135deg, #2a1a2a, #1f0d1f);
-        border-color: rgba(255, 107, 157, 0.25);
-        color: var(--c-group); font-size: 16px;
-    }
-    .fw-online {
-        position: absolute; bottom: -1px; right: -1px;
-        width: 13px; height: 13px; border-radius: 50%;
-        background: var(--c-online);
-        border: 2px solid #080c14;
-        box-shadow: 0 0 6px var(--c-online);
-    }
-
-    /* ── Info ──────────────────────────────────────── */
-    .fw-info { flex: 1; min-width: 0; }
-    .fw-name {
-        font-size: 15px; font-weight: 600; color: var(--c-text);
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        letter-spacing: -0.1px;
-    }
-    .fw-sub {
-        display: flex; align-items: center; gap: 5px;
-        font-size: 12px; color: var(--c-text-muted); margin-top: 3px;
-    }
-    .fw-sub--online { color: var(--c-online); }
-    .fw-pulse {
-        width: 6px; height: 6px; border-radius: 50%;
-        background: var(--c-online);
-        animation: pulse 2s ease-in-out infinite;
-    }
-    @@keyframes pulse {
-        0%, 100% { opacity: 1; transform: scale(1); }
-        50%       { opacity: 0.5; transform: scale(0.7); }
-    }
-
-    /* ── Checkbox ──────────────────────────────────── */
-    .fw-check-wrap {
-        position: relative; width: 26px; height: 26px; flex-shrink: 0;
-    }
-    .fw-check-wrap input[type="checkbox"] {
-        position: absolute; opacity: 0; inset: 0; cursor: pointer; z-index: 1;
-    }
-    .fw-checkmark {
-        position: absolute; inset: 0;
-        border-radius: 8px;
-        border: 1.5px solid rgba(255,255,255,0.12);
-        background: var(--c-surface);
-        transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1);
-        display: flex; align-items: center; justify-content: center;
-    }
-    .fw-checkmark i {
-        font-size: 11px; color: #080c14; opacity: 0;
-        transform: scale(0); transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1);
-    }
-    .fw-check-wrap input:checked ~ .fw-checkmark {
-        background: linear-gradient(135deg, var(--c-accent), var(--c-accent-2));
-        border-color: transparent;
-        box-shadow: 0 0 12px var(--c-accent-glow);
-    }
-    .fw-check-wrap input:checked ~ .fw-checkmark i {
-        opacity: 1; transform: scale(1);
-    }
-
-    /* ── Empty / No results ────────────────────────── */
-    .fw-empty {
-        display: flex; flex-direction: column;
-        align-items: center; justify-content: center;
-        padding: 48px 20px; gap: 12px; color: var(--c-text-muted);
-        text-align: center;
-    }
-    .fw-empty-icon {
-        width: 64px; height: 64px; border-radius: 20px;
-        background: var(--c-surface);
-        border: 1px solid var(--c-border);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 24px; color: var(--c-text-muted);
-        margin-bottom: 4px;
-    }
-    .fw-empty p { font-size: 16px; font-weight: 600; color: var(--c-text-sub); }
-    .fw-empty span { font-size: 13px; color: var(--c-text-muted); }
-
-    /* ── Bottom bar ────────────────────────────────── */
-    .fw-bottom {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
-        border-top: 1px solid var(--c-border);
-        background: rgba(8,12,20,0.8);
-        backdrop-filter: blur(12px);
-        flex-shrink: 0;
+    .message-preview-content {
+        display: flex;
+        align-items: center;
         gap: 12px;
     }
 
-    .fw-bottom-left {
-        display: flex; align-items: baseline; gap: 6px;
+    .message-preview-icon {
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 18px;
+        flex-shrink: 0;
     }
-    .fw-bottom-count {
-        font-family: 'Space Grotesk', sans-serif;
-        font-size: 28px; font-weight: 700; color: var(--c-text);
-        line-height: 1;
-        transition: color 0.3s;
-    }
-    .fw-bottom-count.has-selection { color: var(--c-accent); }
-    .fw-bottom-label { font-size: 13px; color: var(--c-text-muted); }
 
-    .fw-send {
-        display: flex; align-items: center; gap: 0;
-        padding: 0; border: none; cursor: pointer;
-        border-radius: 16px; overflow: hidden;
-        transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
-        box-shadow: 0 4px 20px var(--c-accent-glow);
-        outline: none;
+    .message-preview-text {
+        flex: 1;
+        color: var(--text-primary);
+        font-size: 14px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
-    .fw-send:disabled {
-        opacity: 0.3; cursor: not-allowed;
-        box-shadow: none; transform: none !important;
-    }
-    .fw-send-text {
-        padding: 13px 18px 13px 20px;
-        background: linear-gradient(135deg, var(--c-accent), var(--c-accent-2));
-        color: #080c14; font-size: 14px; font-weight: 700;
-        font-family: 'Space Grotesk', sans-serif;
-        letter-spacing: -0.2px;
-    }
-    .fw-send-icon {
-        padding: 13px 16px;
-        background: rgba(0,0,0,0.2);
-        color: #080c14; font-size: 14px;
-        display: flex; align-items: center;
-    }
-    .fw-send:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 30px var(--c-accent-glow); }
-    .fw-send:active:not(:disabled) { transform: translateY(0); }
 
-    /* loading state */
-    .fw-send.sending .fw-send-text { opacity: 0.7; }
+    .message-preview-file {
+        font-size: 12px;
+        color: var(--text-secondary);
+    }
+
+    .section-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin: 20px 0 12px 4px;
+    }
+
+    .recipients-list {
+        background: var(--surface);
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(99, 102, 241, 0.1);
+    }
+
+    .recipient-item {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 16px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border-bottom: 1px solid #f3f4f6;
+    }
+
+    .recipient-item:last-child {
+        border-bottom: none;
+    }
+
+    .recipient-item:hover {
+        background: #f9fafb;
+    }
+
+    .recipient-item.selected {
+        background: #eef2ff;
+    }
+
+    .recipient-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 18px;
+        flex-shrink: 0;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .recipient-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .recipient-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .recipient-name {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .recipient-name .forwarded-badge {
+        font-size: 10px;
+        font-weight: 500;
+        background: #e0e7ff;
+        color: #6366f1;
+        padding: 2px 6px;
+        border-radius: 4px;
+    }
+
+    .recipient-status {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-top: 2px;
+    }
+
+    .online-indicator {
+        width: 10px;
+        height: 10px;
+        background: #34d399;
+        border-radius: 50%;
+        border: 2px solid white;
+        position: absolute;
+        bottom: 0;
+        right: 0;
+    }
+
+    .forward-btn {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: white;
+        border: none;
+        padding: 16px 28px;
+        border-radius: 16px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+        transition: all 0.3s;
+        display: none;
+        z-index: 100;
+    }
+
+    .forward-btn.visible {
+        display: block;
+    }
+
+    .forward-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 30px rgba(99, 102, 241, 0.5);
+    }
+
+    .group-avatar {
+        background: linear-gradient(135deg, #f093fb, #f5576c);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--text-secondary);
+    }
+
+    .empty-state i {
+        font-size: 40px;
+        margin-bottom: 12px;
+        opacity: 0.5;
+    }
+
+    .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: #1f2937;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 12px;
+        font-size: 14px;
+        opacity: 0;
+        transition: all 0.3s;
+        z-index: 1000;
+    }
+
+    .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+
+    .loading-spinner {
+        width: 30px;
+        height: 30px;
+        border: 3px solid #f3f4f6;
+        border-top-color: #6366f1;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 40px auto;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .no-message-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .no-message-state i {
+        font-size: 60px;
+        color: #d1d5db;
+        margin-bottom: 16px;
+    }
+
+    .no-message-state h3 {
+        color: var(--text-primary);
+        margin-bottom: 8px;
+    }
+
+    .no-message-state p {
+        color: var(--text-secondary);
+    }
 </style>
 
-<script>
-    const forwardMsg = JSON.parse(sessionStorage.getItem('forwardMsg') || 'null');
-    if (!forwardMsg) window.location.href = '/Chat/Index';
+<div class="forward-container" id="mainContainer">
+    <!-- Header -->
+    <div class="forward-header">
+        <a href="/Chat/Index" class="back-btn">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+        <div class="forward-title">Forward to</div>
+    </div>
 
-    /* ── Render preview ── */
-    const previewContent = document.getElementById('forwardPreviewContent');
-    if (forwardMsg) {
-        if (forwardMsg.fileType === 'image') {
-            previewContent.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><img src="${forwardMsg.text}" style="height:36px;width:52px;border-radius:8px;object-fit:cover;border:1px solid rgba(255,255,255,0.1);" /><span>📷 Photo</span></div>`;
-        } else if (forwardMsg.fileType === 'video') {
-            previewContent.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><i class="fas fa-video" style="color:var(--c-accent);font-size:18px;"></i><span>🎬 Video</span></div>`;
-        } else if (forwardMsg.fileType === 'audio') {
-            previewContent.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><i class="fas fa-microphone" style="color:var(--c-accent);font-size:18px;"></i><span>🎤 Voice message</span></div>`;
-        } else if (forwardMsg.fileType === 'document') {
-            previewContent.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><i class="fas fa-file-alt" style="color:var(--c-accent);font-size:18px;"></i><span>📄 ${forwardMsg.fileName || 'Document'}</span></div>`;
+    <!-- Message Preview -->
+    <div class="message-preview" id="messagePreview" style="display: none;">
+        <div class="message-preview-label">Forwarding message</div>
+        <div class="message-preview-content">
+            <div class="message-preview-icon" id="messageIcon">
+                <i class="fas fa-comment"></i>
+            </div>
+            <div>
+                <div class="message-preview-text" id="messageText"></div>
+                <div class="message-preview-file" id="messageFileName" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- No Message State -->
+    <div class="no-message-state" id="noMessageState">
+        <i class="fas fa-share-alt"></i>
+        <h3>No message selected</h3>
+        <p>Go back and select a message to forward</p>
+        <a href="/Chat/Index" style="display: inline-block; margin-top: 16px; color: var(--primary-color);">Go to Chats</a>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading-spinner" id="loadingSpinner"></div>
+
+    <!-- Users Section -->
+    <div id="usersSection" style="display: none;">
+        <div class="section-title">Users</div>
+        <div class="recipients-list" id="usersList"></div>
+    </div>
+
+    <!-- Groups Section -->
+    <div id="groupsSection" style="display: none;">
+        <div class="section-title">Groups</div>
+        <div class="recipients-list" id="groupsList"></div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state" id="emptyState" style="display: none;">
+        <i class="fas fa-users"></i>
+        <p>No users or groups to forward to</p>
+    </div>
+</div>
+
+<!-- Forward Button -->
+<button class="forward-btn" id="forwardBtn" onclick="forwardMessage()">
+    <i class="fas fa-paper-plane"></i> Forward
+</button>
+
+<!-- Toast -->
+<div class="toast" id="toast">Message forwarded successfully!</div>
+
+<script>
+    let selectedRecipients = [];
+    let forwardData = null;
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', async function() {
+        // Read message from sessionStorage
+        const storedData = sessionStorage.getItem('forwardMessage');
+        if (storedData) {
+            forwardData = JSON.parse(storedData);
+            displayMessagePreview(forwardData);
+        }
+
+        // Load recipients from server
+        await loadRecipients();
+    });
+
+    function displayMessagePreview(data) {
+        if (!data) return;
+
+        document.getElementById('noMessageState').style.display = 'none';
+        document.getElementById('messagePreview').style.display = 'block';
+        document.getElementById('messageText').textContent = data.message || data.text || '';
+
+        const iconEl = document.getElementById('messageIcon');
+        const fileNameEl = document.getElementById('messageFileName');
+
+        if (data.fileType) {
+            fileNameEl.style.display = 'block';
+            fileNameEl.textContent = data.fileName || data.fileType;
+
+            if (data.fileType.startsWith('image')) {
+                iconEl.innerHTML = '<i class="fas fa-image"></i>';
+            } else if (data.fileType.startsWith('video')) {
+                iconEl.innerHTML = '<i class="fas fa-video"></i>';
+            } else if (data.fileType === 'audio') {
+                iconEl.innerHTML = '<i class="fas fa-microphone"></i>';
+            } else {
+                iconEl.innerHTML = '<i class="fas fa-file"></i>';
+            }
         } else {
-            const txt = forwardMsg.text || '';
-            previewContent.textContent = txt.length > 120 ? txt.substring(0, 120) + '…' : txt;
+            iconEl.innerHTML = '<i class="fas fa-comment"></i>';
         }
     }
 
-    /* ── Selection logic ── */
-    function updateSelection() {
-        const checked = document.querySelectorAll('.recipient-checkbox:checked');
-        const count = checked.length;
+    async function loadRecipients() {
+        try {
+            const response = await fetch('/Chat/GetForwardRecipients');
+            const data = await response.json();
 
-        document.getElementById('bottomSelectedCount').textContent = count;
-        document.getElementById('headerBadgeCount').textContent = count;
-        document.getElementById('forwardSendBtn').disabled = count === 0;
+            document.getElementById('loadingSpinner').style.display = 'none';
 
-        const countEl = document.querySelector('.fw-bottom-count');
-        countEl.classList.toggle('has-selection', count > 0);
+            if (data.users && data.users.length > 0) {
+                renderUsers(data.users);
+                document.getElementById('usersSection').style.display = 'block';
+            }
 
-        const badge = document.getElementById('headerBadge');
-        badge.classList.toggle('visible', count > 0);
+            if (data.groups && data.groups.length > 0) {
+                renderGroups(data.groups);
+                document.getElementById('groupsSection').style.display = 'block';
+            }
 
-        /* highlight selected items */
-        document.querySelectorAll('.fw-item').forEach(item => {
-            const cb = item.querySelector('.recipient-checkbox');
-            item.classList.toggle('is-selected', cb && cb.checked);
-        });
+            if ((!data.users || data.users.length === 0) && (!data.groups || data.groups.length === 0)) {
+                document.getElementById('emptyState').style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Error loading recipients:', error);
+            document.getElementById('loadingSpinner').style.display = 'none';
+            document.getElementById('emptyState').style.display = 'block';
+        }
     }
 
-    document.querySelectorAll('.fw-item').forEach(item => {
-        item.addEventListener('click', function(e) {
-            if (e.target.tagName === 'INPUT' && e.target.type === 'checkbox') return;
-            const cb = this.querySelector('.recipient-checkbox');
-            if (cb) { cb.checked = !cb.checked; updateSelection(); }
-        });
-    });
-    document.querySelectorAll('.recipient-checkbox').forEach(cb => {
-        cb.addEventListener('change', updateSelection);
-    });
-
-    /* ── Search/filter ── */
-    function filterList(query) {
-        const q = query.trim().toLowerCase();
-        let visibleCount = 0;
-
-        document.querySelectorAll('.fw-item').forEach(item => {
-            const name = item.dataset.name || '';
-            const show = !q || name.includes(q);
-            item.style.display = show ? '' : 'none';
-            if (show) visibleCount++;
-        });
-
-        document.getElementById('noResults').style.display = (visibleCount === 0 && q) ? 'flex' : 'none';
+    function renderUsers(users) {
+        const container = document.getElementById('usersList');
+        container.innerHTML = users.map(user => `
+            <div class="recipient-item" data-id="${user.id}" data-type="user" onclick="toggleSelection(${user.id}, 'user', this)">
+                <div class="recipient-avatar">
+                    ${user.profileImagePath ? `<img src="${user.profileImagePath}" alt="${user.username}" />` : user.username.charAt(0).toUpperCase()}
+                    ${user.isOnline ? '<span class="online-indicator"></span>' : ''}
+                </div>
+                <div class="recipient-info">
+                    <div class="recipient-name">${user.username}</div>
+                    <div class="recipient-status">${user.isOnline ? 'Online' : 'Offline'}</div>
+                </div>
+            </div>
+        `).join('');
     }
 
-    /* ── Send ── */
-    async function sendForward() {
-        const btn = document.getElementById('forwardSendBtn');
+    function renderGroups(groups) {
+        const container = document.getElementById('groupsList');
+        container.innerHTML = groups.map(group => `
+            <div class="recipient-item" data-id="${group.groupId}" data-type="group" onclick="toggleSelection(${group.groupId}, 'group', this)">
+                <div class="recipient-avatar group-avatar">
+                    ${group.profileImagePath ? `<img src="${group.profileImagePath}" alt="${group.groupName}" />` : '<i class="fas fa-users"></i>'}
+                </div>
+                <div class="recipient-info">
+                    <div class="recipient-name">
+                        ${group.groupName}
+                        <span class="forwarded-badge">Forwarded</span>
+                    </div>
+                    <div class="recipient-status">${group.userIds ? group.userIds.length : 0} members</div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function toggleSelection(id, type, element) {
+        const index = selectedRecipients.findIndex(r => r.id === id && r.type === type);
+
+        if (index > -1) {
+            selectedRecipients.splice(index, 1);
+            element.classList.remove('selected');
+        } else {
+            selectedRecipients.push({ id: id, type: type });
+            element.classList.add('selected');
+        }
+
+        updateForwardButton();
+    }
+
+    function updateForwardButton() {
+        const btn = document.getElementById('forwardBtn');
+        if (selectedRecipients.length > 0 && forwardData) {
+            btn.classList.add('visible');
+            btn.innerHTML = `<i class="fas fa-paper-plane"></i> Forward to ${selectedRecipients.length}`;
+        } else {
+            btn.classList.remove('visible');
+        }
+    }
+
+    async function forwardMessage() {
+        if (selectedRecipients.length === 0 || !forwardData) return;
+
+        const btn = document.getElementById('forwardBtn');
         btn.disabled = true;
-        btn.classList.add('sending');
-        btn.querySelector('.fw-send-text').textContent = 'Sending…';
-        btn.querySelector('.fw-send-icon').innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
 
-        const userIds = [], groupIds = [];
-        document.querySelectorAll('.recipient-checkbox:checked').forEach(cb => {
-            if (cb.dataset.type === 'user') userIds.push(parseInt(cb.dataset.id));
-            else if (cb.dataset.type === 'group') groupIds.push(parseInt(cb.dataset.id));
-        });
+        const request = {
+            messageId: forwardData.messageId,
+            text: forwardData.message || forwardData.text,
+            fileType: forwardData.fileType,
+            fileName: forwardData.fileName,
+            recipients: selectedRecipients
+        };
 
         try {
-            const response = await fetch('/Chat/SendForward', {
+            const response = await fetch('/Chat/ForwardMessage', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userIds, groupIds,
-                    text: forwardMsg.text || '',
-                    fileType: forwardMsg.fileType || null,
-                    fileName: forwardMsg.fileName || null,
-                    duration: forwardMsg.duration || null
-                })
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(request)
             });
 
-            if (response.ok) {
-                sessionStorage.removeItem('forwardMsg');
-                window.location.href = '/Chat/Index';
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('Message forwarded successfully!');
+                sessionStorage.removeItem('forwardMessage');
+                setTimeout(() => {
+                    window.location.href = '/Chat/Index';
+                }, 1000);
             } else {
-                alert('Failed to forward message. Please try again.');
+                showToast(result.message || 'Failed to forward message');
                 btn.disabled = false;
-                btn.classList.remove('sending');
-                btn.querySelector('.fw-send-text').textContent = 'Send Now';
-                btn.querySelector('.fw-send-icon').innerHTML = '<i class="fas fa-paper-plane"></i>';
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Forward';
             }
-        } catch (err) {
-            console.error('Forward failed:', err);
-            alert('Failed to forward message. Please try again.');
+        } catch (error) {
+            console.error('Error forwarding message:', error);
+            showToast('An error occurred');
             btn.disabled = false;
-            btn.classList.remove('sending');
-            btn.querySelector('.fw-send-text').textContent = 'Send Now';
-            btn.querySelector('.fw-send-icon').innerHTML = '<i class="fas fa-paper-plane"></i>';
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i> Forward';
         }
     }
+
+    function showToast(message) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3000);
+    }
+
 </script>

@@ -17,7 +17,12 @@ namespace Chat_App.Repositories
             => await _context.user.AnyAsync(x => x.email == email);
         public async Task<bool> ExistsByUsernameAsync(string username)
             => await _context.user.AnyAsync(x => x.username == username);
-        public async Task AddAsync(UsersList user) { _context.user.Add(user); await _context.SaveChangesAsync(); }
+        public async Task AddAsync(UsersList user)
+        {
+            user.Role = "User";
+            _context.user.Add(user);
+            await _context.SaveChangesAsync();
+        }
         public async Task SaveChangesAsync() { await _context.SaveChangesAsync(); }
         public async Task<Dictionary<int, UsersList>> GetByIdsDictionaryAsync(List<int> userIds)
             => await _context.user.Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u);
@@ -29,6 +34,58 @@ namespace Chat_App.Repositories
             var total = await query.CountAsync();
             var users = await query.OrderBy(u => u.username).Skip(skip).Take(take).ToListAsync();
             return (users, total);
+        }
+        public async Task<List<UsersList>> GetAllUsersAsync()
+    => await _context.user.OrderBy(u => u.username).ToListAsync();
+
+
+        public async Task<List<ChatConversationItem>> GetAllUsersWithLastMessageAsync(int adminId)
+        {
+            var users = await _context.user
+                .Where(u => u.Id != adminId)
+                .ToListAsync();
+
+            var result = new List<ChatConversationItem>();
+
+            foreach (var u in users)
+            {
+                // Get last message strictly between admin and this user
+                var lastMessage = await _context.message
+                    .Where(m =>
+                        (m.SenderId == adminId && m.ReceiverId == u.Id) ||
+                        (m.SenderId == u.Id && m.ReceiverId == adminId))
+                    .Where(m => m.DeletedStatus != "EveryOne") // skip deleted-for-everyone
+                    .OrderByDescending(m => m.SentAt)
+                    .FirstOrDefaultAsync();
+
+                // Count unread messages sent TO admin FROM this user
+                var unreadCount = await _context.message
+                    .CountAsync(m =>
+                        m.SenderId == u.Id &&
+                        m.ReceiverId == adminId &&
+                        !m.IsRead &&
+                        !m.BlockedStatus);
+
+                result.Add(new ChatConversationItem
+                {
+                    Id = u.Id,
+                    DisplayName = u.username,
+                    ProfileImagePath = u.ProfileImagePath,
+                    LastMessageText = lastMessage == null ? null
+                        : lastMessage.DeletedStatus == "EveryOne" ? "This message was deleted"
+                        : lastMessage.Text,
+                    LastMessageTime = lastMessage?.SentAt,
+                    FileType = lastMessage?.FileType,
+                    FileName = lastMessage?.FileName,
+                    UnreadCount = unreadCount,
+                    IsOnline = u.IsOnline,
+                    IsGroup = false
+                });
+            }
+
+            return result
+                .OrderByDescending(c => c.LastMessageTime ?? DateTime.MinValue)
+                .ToList();
         }
     }
 }

@@ -25,6 +25,5 @@ namespace Chat_App.Repositories
             => await _context.groupMessage.Where(m => m.IsStared == true).ToListAsync();
         public void Update(GroupMessage message) { _context.groupMessage.Update(message); }
         public async Task SaveChangesAsync() { await _context.SaveChangesAsync(); }
-       
     }
 }

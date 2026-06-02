@@ -107,6 +107,9 @@ namespace Chat_App.Services.Implementations
         public async Task<UserSearchResultDto> GetAllUsersForFriendRequest(int currentUserId, int skip = 0, int take = 15)
         {
             var (users, totalCount) = await _userRepo.SearchExceptAsync(currentUserId, skip, take);
+            // Remove Admin users
+            users = users.Where(u => u.Role != "Admin").ToList();
+
             var userIds = users.Select(u => u.Id).ToList();
             var friendships = await _friendRequestRepo.GetFriendshipsForUsersAsync(currentUserId, userIds);
             var result = users.Select(u =>
@@ -114,6 +117,7 @@ namespace Chat_App.Services.Implementations
                 var friendship = friendships.FirstOrDefault(f =>
                     (f.SenderId == currentUserId && f.ReceiverId == u.Id) ||
                     (f.SenderId == u.Id && f.ReceiverId == currentUserId));
+              
                 FriendshipStatusDto status;
                 if (friendship == null)
                     status = new FriendshipStatusDto { Status = "None" };

@@ -14,5 +14,7 @@ namespace Chat_App.Repositories
         Task<List<UsersList>> GetByFriendIdsAsync(List<int> friendIds);
         Task<(List<UsersList> Users, int TotalCount)> SearchExceptAsync(int currentUserId, int skip, int take);
         IQueryable<UsersList> Query();
+         Task<List<UsersList>> GetAllUsersAsync();
+        Task<List<ChatConversationItem>> GetAllUsersWithLastMessageAsync(int adminId);
     }
 }

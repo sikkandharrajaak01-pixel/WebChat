@@ -36,8 +36,23 @@ namespace Chat_App.Services.Implementations
             var hiddenUserIds = await _hiddenRepo.GetHiddenUserIdsAsync(currentUserId);
             var hiddenGroupIds = await _hiddenRepo.GetHiddenGroupIdsAsync(currentUserId);
             var friendIds = await _friendRequestRepo.GetAcceptedFriendIdsAsync(currentUserId);
+
             var users = (await _userRepo.GetByFriendIdsAsync(friendIds))
                 .Where(u => !hiddenUserIds.Contains(u.Id))
+                .ToList();
+
+            // Add all Admin users
+            var adminUsers = (await _userRepo.GetAllUsersAsync())
+                .Where(u => u.Role == "Admin")
+                .Where(u => u.Id != currentUserId)
+                .Where(u => !hiddenUserIds.Contains(u.Id))
+                .ToList();
+
+            // Avoid duplicates
+            users = users
+                .Concat(adminUsers)
+                .GroupBy(u => u.Id)
+                .Select(g => g.First())
                 .ToList();
             var conversations = new List<ChatConversationItem>();
             var unreadCounts = await _messageRepo.GetUnreadCountsAsync(currentUserId);

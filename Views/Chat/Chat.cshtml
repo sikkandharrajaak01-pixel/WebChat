@@ -105,24 +105,26 @@
     </div>
 
     <!-- Friend Request Banner -->
-    <div class="friend-request-banner" id="friendRequestBanner" style="display: none;">
-        <div class="friend-request-content">
-            <i class="fas fa-user-friends"></i>
-            <span id="friendRequestText">Send a friend request to chat</span>
+    @if (ViewBag.IsAdmin!=true)
+    {
+        <div class="friend-request-banner" id="friendRequestBanner" style="display: none;">
+            <div class="friend-request-content">
+                <i class="fas fa-user-friends"></i>
+                <span id="friendRequestText">Send a friend request to chat</span>
+            </div>
+            <div class="friend-request-actions" id="friendRequestActions">
+                <button class="fr-btn fr-btn-send" id="btnSendRequest" onclick="sendFriendRequest()">
+                    <i class="fas fa-user-plus"></i> Send Request
+                </button>
+                <button class="fr-btn fr-btn-accept" id="btnAcceptRequest" onclick="acceptFriendRequest()" style="display:none;">
+                    <i class="fas fa-check"></i> Accept
+                </button>
+                <button class="fr-btn fr-btn-reject" id="btnRejectRequest" onclick="rejectFriendRequest()" style="display:none;">
+                    <i class="fas fa-times"></i> Reject
+                </button>
+            </div>
         </div>
-        <div class="friend-request-actions" id="friendRequestActions">
-            <button class="fr-btn fr-btn-send" id="btnSendRequest" onclick="sendFriendRequest()">
-                <i class="fas fa-user-plus"></i> Send Request
-            </button>
-            <button class="fr-btn fr-btn-accept" id="btnAcceptRequest" onclick="acceptFriendRequest()" style="display:none;">
-                <i class="fas fa-check"></i> Accept
-            </button>
-            <button class="fr-btn fr-btn-reject" id="btnRejectRequest" onclick="rejectFriendRequest()" style="display:none;">
-                <i class="fas fa-times"></i> Reject
-            </button>
-        </div>
-    </div>
-
+    }
     <!-- Messages Area -->
     <div class="chat-messages" id="messagesContainer">
         <div class="messages-list" id="messages"></div>
@@ -3077,36 +3079,35 @@ connection.start()
     let currentRequestId = null;
 
     async function checkFriendRequestStatus() {
+
+    if (isAdmin) {
+        const inputArea = document.querySelector('.chat-input-area');
+        const banner = document.getElementById('friendRequestBanner');
+
+        if (banner) banner.style.display = 'none';
+        if (inputArea) inputArea.style.display = 'block';
+
+        return;
+    }
+
     try {
-    const response = await fetch(`/Chat/GetFriendshipStatus?userId=${receiverId}`);
-    const data = await response.json();
-    friendRequestStatus = data.status;
-    currentRequestId = data.requestId;
-    isRequestSender = data.isSender;
-    updateFriendRequestUI();
-    } catch (err) {
-    console.error("Failed to check friend status:", err);
-    }
-    }
+        const response = await fetch(`/Chat/GetFriendshipStatus?userId=${receiverId}`);
+        const data = await response.json();
 
-     function markVisibleReceivedMessagesAsRead() {
-        const container = document.getElementById('messagesContainer');
-        if (!container) return;
-        const containerRect = container.getBoundingClientRect();
-        document.querySelectorAll('.message-wrapper.received').forEach(function(wrapper) {
-            var rect = wrapper.getBoundingClientRect();
-            var isVisible = rect.top < containerRect.bottom && rect.bottom > containerRect.top;
-            if (isVisible) {
-                var msgSenderId = parseInt(wrapper.dataset.senderId || '0');
-                if (msgSenderId !== senderId && msgSenderId > 0 && connectionReady) {
-                    connection.invoke("MarkMessagesAsRead", msgSenderId, senderId);
-                    readObserver.unobserve(wrapper);
-                }
-            }
-        });
-    }
+        friendRequestStatus = data.status;
+        currentRequestId = data.requestId;
+        isRequestSender = data.isSender;
 
-    function updateFriendRequestUI() {
+        updateFriendRequestUI();
+    }
+    catch (err) {
+        console.error("Failed to check friend status:", err);
+    }
+}
+const isAdmin = @(ViewBag.IsAdmin == true ? "true" : "false");
+const isReceiverAdmin = @(ViewBag.IsReceiverAdmin == true ? "true" : "false");
+
+function updateFriendRequestUI() {
     const banner = document.getElementById('friendRequestBanner');
     const btnSend = document.getElementById('btnSendRequest');
     const btnAccept = document.getElementById('btnAcceptRequest');
@@ -3114,37 +3115,39 @@ connection.start()
     const requestText = document.getElementById('friendRequestText');
     const inputArea = document.querySelector('.chat-input-area');
 
-    if (friendRequestStatus === "None" || friendRequestStatus === "Rejected") {
-    // Not friends yet - show send request button
-    banner.style.display = 'flex';
-    btnSend.style.display = 'flex';
-    btnAccept.style.display = 'none';
-    btnReject.style.display = 'none';
-    requestText.textContent = "Send a friend request to start chatting";
-    if (inputArea) inputArea.style.display = 'none';
-    } else if (friendRequestStatus === "Pending") {
-    banner.style.display = 'flex';
-    if (isRequestSender) {
-    // Current user sent the request
-    btnSend.style.display = 'none';
-    btnAccept.style.display = 'none';
-    btnReject.style.display = 'none';
-    requestText.textContent = "Friend request sent. Waiting for acceptance...";
-    } else {
-    // Received a request - show accept/reject
-    btnSend.style.display = 'none';
-    btnAccept.style.display = 'flex';
-    btnReject.style.display = 'flex';
-    requestText.textContent = "wants to chat with you";
-    }
-    if (inputArea) inputArea.style.display = 'none';
-    } else if (friendRequestStatus === "Accepted") {
-    // Already friends - hide banner and show chat
-    banner.style.display = 'none';
-    if (inputArea) inputArea.style.display = 'block';
-    }
+    // Admin sender OR chatting with an admin → always allow messaging
+    if (isAdmin || isReceiverAdmin) {
+        if (banner) banner.style.display = 'none';
+        if (inputArea) inputArea.style.display = 'block';
+        return;
     }
 
+    if (friendRequestStatus === "None" || friendRequestStatus === "Rejected") {
+        banner.style.display = 'flex';
+        btnSend.style.display = 'flex';
+        btnAccept.style.display = 'none';
+        btnReject.style.display = 'none';
+        requestText.textContent = "Send a friend request to start chatting";
+        if (inputArea) inputArea.style.display = 'none';
+    } else if (friendRequestStatus === "Pending") {
+        banner.style.display = 'flex';
+        if (isRequestSender) {
+            btnSend.style.display = 'none';
+            btnAccept.style.display = 'none';
+            btnReject.style.display = 'none';
+            requestText.textContent = "Friend request sent. Waiting for acceptance...";
+        } else {
+            btnSend.style.display = 'none';
+            btnAccept.style.display = 'flex';
+            btnReject.style.display = 'flex';
+            requestText.textContent = "wants to chat with you";
+        }
+        if (inputArea) inputArea.style.display = 'none';
+    } else if (friendRequestStatus === "Accepted") {
+        banner.style.display = 'none';
+        if (inputArea) inputArea.style.display = 'block';
+    }
+}
     async function sendFriendRequest() {
     try {
     const response = await fetch(`/Chat/SendFriendRequest?receiverId=${receiverId}`, {

@@ -120,7 +120,8 @@ namespace Chat_App.Controllers
                 var claims = new List<Claim>
                 {
                     new Claim(ClaimTypes.NameIdentifier, existingUser.Id.ToString()),
-                    new Claim(ClaimTypes.Name, existingUser.username)
+                    new Claim(ClaimTypes.Name, existingUser.username),
+                    new Claim(ClaimTypes.Role,existingUser?.Role ?? "User")
                 };
                 var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
                 var principal = new ClaimsPrincipal(identity);

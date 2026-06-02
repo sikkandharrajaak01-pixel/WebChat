@@ -28,5 +28,8 @@
 
         public bool IsStared { get; set; } = false;
         public double? Duration { get; set; }
+
+        public bool IsForwarded { get; set; } = false;
+        public int? OriginalSenderId { get; set; }
     }
 }
